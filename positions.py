@@ -31,6 +31,13 @@ MANDATORY_POSITIONS = [
 INTERMEDIATE_POSITIONS = [
     "rotation_handgun",      # Movimento del braccio con oggetto/ventaglio
     "right_arm",             # Rotazione del braccio destro sopra la testa
+    "arm_to_sky",            # Braccio destro verso il cielo sul primo "One more time"
+    "disco_groove",
+    "side_step_groove",
+    "robot_pulse",
+    "arm_wave_combo",
+    "party_punches",
+    "climax_reach",
     "double_movement",       # Rotazione sincrona di entrambi gli arti superiori
     "arms_opening",          # Apertura e rotazione di entrambi gli arti superiori
     "union_arms",            # Movimento di unione delle braccia
@@ -51,6 +58,154 @@ CRG_ANIMATIONS = [
     "sprinkler",             # Danza sprinkler
     "workout"                # Esercizio fisico / allenamento
 ]
+
+# Pose frames are degrees (hand values stay in NAO's 0..1 range). Each phrase
+# has eight beat targets and returns to a shared neutral arm pose.
+DANCE_JOINTS = [
+    "LShoulderPitch", "LShoulderRoll", "LElbowYaw", "LElbowRoll", "LWristYaw", "LHand",
+    "RShoulderPitch", "RShoulderRoll", "RElbowYaw", "RElbowRoll", "RWristYaw", "RHand",
+    "HeadYaw", "HeadPitch"
+]
+
+
+def _dance_pose(left, right, head_yaw=0.0, head_pitch=0.0):
+    return tuple(left + right + [head_yaw, head_pitch])
+
+
+_NEUTRAL = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [78, -16, 68, 49, 0, 0.0]
+)
+_OPEN = _dance_pose(
+    [28, 38, -60, -28, 0, 0.2],
+    [28, -38, 60, 28, 0, 0.2]
+)
+_DRIVE = _dance_pose(
+    [42, 12, -75, -78, 0, 0.0],
+    [42, -12, 75, 78, 0, 0.0]
+)
+_CROSS = _dance_pose(
+    [52, 8, -80, -35, 0, 0.2],
+    [52, -8, 80, 35, 0, 0.2]
+)
+_REACH = _dance_pose(
+    [18, 30, -65, -65, 0, 0.1],
+    [-38, -18, 70, 28, 0, 0.1],
+    head_yaw=-12
+)
+_LEAN_LEFT = _dance_pose(
+    [38, 38, -65, -45, 0, 0.1],
+    [42, -20, 72, 65, 0, 0.2],
+    head_yaw=-16
+)
+_LEAN_RIGHT = _dance_pose(
+    [42, 20, -72, -65, 0, 0.2],
+    [38, -38, 65, 45, 0, 0.1],
+    head_yaw=16
+)
+_PUNCH_LEFT = _dance_pose(
+    [28, 12, -70, -82, 0, 0.0],
+    [58, -35, 60, 42, 0, 0.0],
+    head_yaw=-10
+)
+_PUNCH_RIGHT = _dance_pose(
+    [58, 35, -60, -42, 0, 0.0],
+    [28, -12, 70, 82, 0, 0.0],
+    head_yaw=10
+)
+_HELLO_LEFT = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [28, -20, 70, 65, 20, 1.0]
+)
+_HELLO_WAVE_LEFT = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [28, -20, 70, 45, -20, 1.0],
+    head_yaw=-8
+)
+_HELLO_WAVE_RIGHT = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [28, -20, 70, 80, 40, 1.0],
+    head_yaw=8
+)
+_WIPE_REACH = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [20, -25, 45, 80, -40, 0.0],
+    head_yaw=-10
+)
+_WIPE_ACROSS = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [28, -20, 55, 88, 20, 0.0],
+    head_yaw=10
+)
+_SKY_REACH = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [-60, -40, 80, 20, 0, 0.0]
+)
+_SKY_REACH_ACCENT = _dance_pose(
+    [68, 16, -68, -49, 0, 0.0],
+    [-48, -32, 80, 30, 0, 0.0],
+    head_yaw=8
+)
+_SEATED_SKY_REACH = _dance_pose(
+    [78, 16, -68, -49, 0, 0.0],
+    [-48, -28, 80, 30, 0, 0.0],
+    head_pitch=-5
+)
+_SEATED_SKY_ACCENT = _dance_pose(
+    [64, 18, -68, -45, 0, 0.0],
+    [-38, -28, 80, 35, 0, 0.0],
+    head_yaw=10,
+    head_pitch=-3
+)
+
+DANCE_PHRASES = {
+    "disco_groove": [
+        _OPEN, _DRIVE, _OPEN, _NEUTRAL, _CROSS, _DRIVE, _OPEN, _NEUTRAL
+    ],
+    "side_step_groove": [
+        _LEAN_LEFT, _NEUTRAL, _LEAN_RIGHT, _NEUTRAL,
+        _LEAN_LEFT, _NEUTRAL, _LEAN_RIGHT, _NEUTRAL
+    ],
+    "robot_pulse": [
+        _CROSS, _DRIVE, _CROSS, _OPEN, _CROSS, _DRIVE, _CROSS, _NEUTRAL
+    ],
+    "arm_wave_combo": [
+        _REACH, _NEUTRAL, _OPEN, _LEAN_LEFT, _NEUTRAL, _REACH, _OPEN, _NEUTRAL
+    ],
+    "party_punches": [
+        _PUNCH_LEFT, _NEUTRAL, _PUNCH_RIGHT, _NEUTRAL,
+        _PUNCH_LEFT, _NEUTRAL, _PUNCH_RIGHT, _NEUTRAL
+    ],
+    "climax_reach": [
+        _REACH, _OPEN, _PUNCH_LEFT, _OPEN,
+        _REACH, _PUNCH_RIGHT, _OPEN, _NEUTRAL
+    ],
+    "hello_wave": [
+        _HELLO_LEFT, _HELLO_WAVE_LEFT, _HELLO_WAVE_RIGHT, _HELLO_WAVE_LEFT,
+        _HELLO_WAVE_RIGHT, _HELLO_WAVE_LEFT, _HELLO_WAVE_RIGHT, _NEUTRAL
+    ],
+    "wipe_forehead": [
+        _WIPE_REACH, _WIPE_ACROSS, _WIPE_REACH, _WIPE_ACROSS,
+        _WIPE_REACH, _WIPE_ACROSS, _HELLO_LEFT, _NEUTRAL
+    ],
+    "arm_to_sky": [
+        _SKY_REACH, _SKY_REACH, _OPEN, _OPEN,
+        _SKY_REACH, _OPEN, _OPEN, _NEUTRAL
+    ],
+    "clap": [
+        _dance_pose(
+            [45, 14, -30, -52, 0, hand],
+            [45, -14, 30, 52, 0, hand]
+        )
+        for hand in (0.2, 0.0, 0.2, 0.0, 0.2, 0.0, 0.2, 0.0)
+    ],
+    "seated_arm_to_sky": [
+        _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
+        _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
+        _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
+        _SEATED_SKY_REACH, _SEATED_SKY_REACH
+    ]
+}
 
 # ==============================================================================
 # 3. CATALOGO COMPLETO DELLE AZIONI (METADATI, DURATE, ENERGIA E POSTURE)
@@ -75,7 +230,7 @@ ACTIONS = {
         "description": "Posizione eretta iniziale con braccia avanzate (risveglio)"
     },
     "Crouch": {
-        "duration": 4.0,
+        "duration": 8.0,
         "energy": 1,
         "pre": STANDING,
         "post": CROUCHING,
@@ -158,6 +313,109 @@ ACTIONS = {
         "type": "intermediate",
         "file": "RobotPositions/2-Right_arm.py",
         "description": "Rotazione disco-funk del braccio destro sopra la testa"
+    },
+    "arm_to_sky": {
+        "duration": 3.0,
+        "energy": 4,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "file": "RobotPositions/21-Arm_to_sky.py",
+        "description": "Alza il braccio destro verso il cielo sul primo 'One more time'"
+    },
+    "step_left": {
+        "duration": 1.951,
+        "energy": 3,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "footwork_direction": 1,
+        "side_step_meters": 0.03,
+        "description": "Piccolo passo laterale controllato verso sinistra"
+    },
+    "step_right": {
+        "duration": 1.951,
+        "energy": 3,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "footwork_direction": -1,
+        "side_step_meters": 0.03,
+        "description": "Piccolo passo laterale controllato verso destra"
+    },
+    "clap": {
+        "duration": 3.902,
+        "energy": 4,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "cue_only": True,
+        "description": "Clap ritmico con mani che si avvicinano senza urto"
+    },
+    "seated_arm_to_sky": {
+        "duration": 3.902,
+        "energy": 5,
+        "pre": None,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "cue_only": True,
+        "description": "Richiamo del ritornello con braccio destro alto, eseguibile anche da seduto"
+    },
+    "disco_groove": {
+        "duration": 3.902,
+        "energy": 4,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "description": "Groove disco a braccia alternate, in otto battiti"
+    },
+    "side_step_groove": {
+        "duration": 3.902,
+        "energy": 3,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "description": "Oscillazione laterale di braccia e testa sincronizzata sul beat"
+    },
+    "robot_pulse": {
+        "duration": 3.902,
+        "energy": 4,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "description": "Pulsazione robotica delle braccia a tempo"
+    },
+    "arm_wave_combo": {
+        "duration": 3.902,
+        "energy": 3,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "description": "Aperture e onde delle braccia con accenti della testa"
+    },
+    "party_punches": {
+        "duration": 3.902,
+        "energy": 5,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "description": "Pugni disco alternati sul tempo forte"
+    },
+    "climax_reach": {
+        "duration": 3.902,
+        "energy": 5,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "dance_phrase": True,
+        "description": "Combinazione energica di slanci e accenti del ritornello"
     },
     "double_movement": {
         "duration": 8.0,
@@ -302,6 +560,9 @@ ACTIONS = {
 # 4. INCOMPATIBILITÀ ESPLICITE
 # ==============================================================================
 EXPLICIT_INCOMPATIBILITIES = {
+    ("step_left", "step_left"),
+    ("step_right", "step_right"),
+
     # Non eseguire passi opposti consecutivi
     ("move_forward", "move_backward"),
     ("move_backward", "move_forward"),

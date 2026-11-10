@@ -6,6 +6,7 @@
             <content>
                 <![CDATA[
 import math
+import threading
 import time
 
 try:
@@ -24,6 +25,15 @@ class MyClass(GeneratedClass):
         pass
 
     def onInput_onStop(self):
+        if hasattr(self, "_choreography_stop"):
+            self._choreography_stop.set()
+        if hasattr(self, "_deadline_cancel"):
+            self._deadline_cancel.set()
+        if hasattr(self, "_motion_proxy"):
+            try:
+                self._motion_proxy.killAll()
+            except Exception as error:
+                print("Impossibile interrompere i movimenti: %s" % error)
         self.onUnload()
         self.onStopped()
 
@@ -31,14 +41,82 @@ class MyClass(GeneratedClass):
         # NOTA: La musica va avviata ESTERNAMENTE (da main.py o manualmente).
         # NON usare subprocess/os dentro Choregraphe: crasha il simulatore.
 
-        try:
-            motionProxy = ALProxy("ALMotion")
-            postureProxy = ALProxy("ALRobotPosture")
-            ttsProxy = ALProxy("ALTextToSpeech")
-        except Exception:
-            motionProxy = ALProxy("ALMotion", "127.0.0.1", 9559)
-            postureProxy = ALProxy("ALRobotPosture", "127.0.0.1", 9559)
-            ttsProxy = ALProxy("ALTextToSpeech", "127.0.0.1", 9559)
+        choreography_start = time.time()
+        choreography_target_time = 120.0
+        crouch_start_time = 112.0
+        choreography_stop = threading.Event()
+        deadline_expired = threading.Event()
+        deadline_cancel = threading.Event()
+        motion_proxy_holder = []
+        self._choreography_stop = choreography_stop
+        self._deadline_cancel = deadline_cancel
+
+        def enforce_deadline():
+            while not deadline_cancel.is_set():
+                remaining = choreography_start + choreography_target_time - time.time()
+                if remaining <= 0:
+                    break
+                time.sleep(min(0.01, remaining))
+            if deadline_cancel.is_set():
+                return
+            deadline_expired.set()
+            choreography_stop.set()
+            self.onStopped()
+            if motion_proxy_holder:
+                try:
+                    motion_proxy_holder[0].killAll()
+                except Exception as error:
+                    print("Impossibile interrompere i movimenti: %s" % error)
+
+        deadline_thread = threading.Thread(target=enforce_deadline)
+        deadline_thread.daemon = True
+        deadline_thread.start()
+
+        proxy_result = {}
+        proxy_error = []
+        proxy_ready = threading.Event()
+
+        def connect_proxies():
+            try:
+                try:
+                    motion_proxy = ALProxy("ALMotion")
+                    posture_proxy = ALProxy("ALRobotPosture")
+                except Exception:
+                    motion_proxy = ALProxy("ALMotion", "127.0.0.1", 9559)
+                    posture_proxy = ALProxy("ALRobotPosture", "127.0.0.1", 9559)
+                proxy_result["motion"] = motion_proxy
+                proxy_result["posture"] = posture_proxy
+            except Exception as error:
+                proxy_error.append(error)
+            finally:
+                proxy_ready.set()
+
+        proxy_thread = threading.Thread(target=connect_proxies)
+        proxy_thread.daemon = True
+        proxy_thread.start()
+        while not proxy_ready.is_set() and not choreography_stop.is_set():
+            remaining = choreography_start + choreography_target_time - time.time()
+            if remaining <= 0:
+                break
+            time.sleep(min(0.01, remaining))
+        if not proxy_ready.is_set() or choreography_stop.is_set():
+            return
+        if proxy_error:
+            print("Impossibile connettersi ai proxy NAOqi: %s" % proxy_error[0])
+            deadline_cancel.set()
+            choreography_stop.set()
+            self.onStopped()
+            return
+        motionProxy = proxy_result["motion"]
+        postureProxy = proxy_result["posture"]
+        self._motion_proxy = motionProxy
+        motion_proxy_holder.append(motionProxy)
+        if deadline_expired.is_set():
+            try:
+                motionProxy.killAll()
+            except Exception as error:
+                print("Impossibile interrompere i movimenti: %s" % error)
+            return
 
         def arm_angles(pitch, roll, eyaw, eroll, wyaw=0.0, hand=0.0):
             return [
@@ -50,155 +128,410 @@ class MyClass(GeneratedClass):
                 hand
             ]
 
+        DANCE_JOINTS = ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw', 'LHand', 'RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw', 'RHand', 'HeadYaw', 'HeadPitch']
+        DANCE_PHRASES = {'disco_groove': [(28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'side_step_groove': [(38, 38, -65, -45, 0, 0.1, 42, -20, 72, 65, 0, 0.2, -16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (42, 20, -72, -65, 0, 0.2, 38, -38, 65, 45, 0, 0.1, 16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (38, 38, -65, -45, 0, 0.1, 42, -20, 72, 65, 0, 0.2, -16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (42, 20, -72, -65, 0, 0.2, 38, -38, 65, 45, 0, 0.1, 16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'robot_pulse': [(52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'arm_wave_combo': [(18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (38, 38, -65, -45, 0, 0.1, 42, -20, 72, 65, 0, 0.2, -16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'party_punches': [(28, 12, -70, -82, 0, 0.0, 58, -35, 60, 42, 0, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (58, 35, -60, -42, 0, 0.0, 28, -12, 70, 82, 0, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (28, 12, -70, -82, 0, 0.0, 58, -35, 60, 42, 0, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (58, 35, -60, -42, 0, 0.0, 28, -12, 70, 82, 0, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'climax_reach': [(18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (28, 12, -70, -82, 0, 0.0, 58, -35, 60, 42, 0, 0.0, -10, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (58, 35, -60, -42, 0, 0.0, 28, -12, 70, 82, 0, 0.0, 10, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'hello_wave': [(78, 16, -68, -49, 0, 0.0, 28, -20, 70, 65, 20, 1.0, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 45, -20, 1.0, -8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 80, 40, 1.0, 8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 45, -20, 1.0, -8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 80, 40, 1.0, 8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 45, -20, 1.0, -8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 80, 40, 1.0, 8, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'wipe_forehead': [(78, 16, -68, -49, 0, 0.0, 20, -25, 45, 80, -40, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 55, 88, 20, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 20, -25, 45, 80, -40, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 55, 88, 20, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 20, -25, 45, 80, -40, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 55, 88, 20, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 65, 20, 1.0, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'arm_to_sky': [(78, 16, -68, -49, 0, 0.0, -60, -40, 80, 20, 0, 0.0, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, -60, -40, 80, 20, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, -60, -40, 80, 20, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'clap': [(45, 14, -30, -52, 0, 0.2, 45, -14, 30, 52, 0, 0.2, 0.0, 0.0), (45, 14, -30, -52, 0, 0.0, 45, -14, 30, 52, 0, 0.0, 0.0, 0.0), (45, 14, -30, -52, 0, 0.2, 45, -14, 30, 52, 0, 0.2, 0.0, 0.0), (45, 14, -30, -52, 0, 0.0, 45, -14, 30, 52, 0, 0.0, 0.0, 0.0), (45, 14, -30, -52, 0, 0.2, 45, -14, 30, 52, 0, 0.2, 0.0, 0.0), (45, 14, -30, -52, 0, 0.0, 45, -14, 30, 52, 0, 0.0, 0.0, 0.0), (45, 14, -30, -52, 0, 0.2, 45, -14, 30, 52, 0, 0.2, 0.0, 0.0), (45, 14, -30, -52, 0, 0.0, 45, -14, 30, 52, 0, 0.0, 0.0, 0.0)], 'seated_arm_to_sky': [(78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (64, 18, -68, -45, 0, 0.0, -38, -28, 80, 35, 0, 0.0, 10, -3), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (64, 18, -68, -45, 0, 0.0, -38, -28, 80, 35, 0, 0.0, 10, -3), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (64, 18, -68, -45, 0, 0.0, -38, -28, 80, 35, 0, 0.0, 10, -3), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5)]}
+
+        def wait_until(target_time):
+            while not choreography_stop.is_set():
+                remaining = target_time - time.time()
+                if remaining <= 0:
+                    return True
+                time.sleep(min(0.05, remaining))
+            return False
+
+        def wait_for_task(task_proxy, task_id, deadline, stop_task):
+            while task_proxy.isRunning(task_id):
+                if choreography_stop.is_set() or time.time() >= deadline:
+                    stop_task()
+                    return False
+                time.sleep(0.03)
+            return not choreography_stop.is_set() and time.time() <= deadline
+
+        def run_posture_action(name, speed, deadline):
+            if choreography_stop.is_set() or time.time() >= deadline:
+                print("Deadline raggiunta prima della transizione a %s." % name)
+                return False
+            try:
+                task_id = postureProxy.post.goToPosture(name, speed)
+                completed = wait_for_task(
+                    postureProxy, task_id, deadline, motionProxy.killAll
+                )
+                if not completed:
+                    print("Transizione a %s interrotta alla deadline." % name)
+                return completed
+            except Exception as error:
+                print("Errore nella transizione a %s: %s" % (name, error))
+                return False
+
+        def run_footwork(x, y, deadline):
+            if choreography_stop.is_set() or time.time() >= deadline:
+                print("Deadline raggiunta prima del passo laterale.")
+                return False
+            try:
+                task_id = motionProxy.post.moveTo(x, y, 0.0)
+                completed = wait_for_task(
+                    motionProxy, task_id, deadline,
+                    lambda: motionProxy.stop(task_id)
+                )
+                if not completed:
+                    print("Passo laterale interrotto alla deadline.")
+                return completed
+            except Exception as error:
+                print("Errore nel passo laterale: %s" % error)
+                return False
+
+        def play_dance_phrase(name, duration, deadline):
+            if choreography_stop.is_set() or time.time() >= deadline:
+                print("Deadline raggiunta prima della frase %s." % name)
+                return False
+            try:
+                poses = DANCE_PHRASES[name]
+                frame_times = [
+                    duration * frame / float(len(poses))
+                    for frame in range(1, len(poses) + 1)
+                ]
+                angle_lists = []
+                time_lists = []
+                for joint_index, joint_name in enumerate(DANCE_JOINTS):
+                    joint_angles = [pose[joint_index] for pose in poses]
+                    if joint_name not in ("LHand", "RHand"):
+                        joint_angles = [math.radians(angle) for angle in joint_angles]
+                    angle_lists.append(joint_angles)
+                    time_lists.append(frame_times)
+                task_id = motionProxy.post.angleInterpolation(
+                    DANCE_JOINTS, angle_lists, time_lists, True
+                )
+                completed = wait_for_task(
+                    motionProxy, task_id, deadline,
+                    lambda: motionProxy.stop(task_id)
+                )
+                if not completed:
+                    print("Frase %s interrotta alla deadline." % name)
+                return completed
+            except Exception as error:
+                print("Errore nella frase %s: %s" % (name, error))
+                return False
+
         # ======================================================================
         # PASSO 01 [Inizio]: StandInit (0.0s -> 4.0s)
         # Evento Musicale: NAO in attesa del primo beat.
         # ======================================================================
-        try:
-            ttsProxy.post.say("One more time!")
-        except Exception:
-            pass
-        postureProxy.goToPosture("StandInit", 0.6)
-        time.sleep(1.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 0.00): return
+        if choreography_stop.is_set(): return
+        run_posture_action("StandInit", 0.65, choreography_start + 4.00)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 02 [Intro: The Horns Hook]: rotation_foot_Lleg (4.0s -> 15.0s)
+        # PASSO 02 [Intro: The Horns Hook]: disco_groove (4.0s -> 8.0s)
         # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
         # ======================================================================
-        try:
-            motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, 0.05], 3.0, False)
-            time.sleep(2.0)
-        except Exception:
-            time.sleep(5.0)
-        postureProxy.goToPosture("StandInit", 0.5)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 4.00): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("disco_groove", 4.007, choreography_start + 8.01)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 03 [Intro: The Horns Hook]: Hello (15.0s -> 19.5s)
+        # PASSO 03 [Intro: The Horns Hook]: step_left (8.0s -> 10.0s)
         # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
         # ======================================================================
-        wave_up = arm_angles(-25.0, -20.0, 70.0, 65.0, 20.0, 1.0)
-        wave_left = arm_angles(-25.0, -20.0, 70.0, 45.0, -20.0, 1.0)
-        wave_right = arm_angles(-25.0, -20.0, 70.0, 80.0, 40.0, 1.0)
-        motionProxy.angleInterpolation("RArm", wave_up, 1.0, True)
-        for _ in range(2):
-            motionProxy.angleInterpolation("RArm", wave_left, 0.35, True)
-            motionProxy.angleInterpolation("RArm", wave_right, 0.35, True)
-        postureProxy.goToPosture("StandInit", 0.6)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 8.01): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, 0.030, choreography_start + 9.96)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 04 [Verse 1: 'One more time, we're gonna celebrate...']: birthday_dance (19.5s -> 34.5s)
+        # PASSO 04 [Intro: The Horns Hook]: step_right (10.0s -> 11.9s)
+        # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 9.96): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, -0.030, choreography_start + 11.91)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 05 [Intro: The Horns Hook]: step_left (11.9s -> 13.9s)
+        # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 11.91): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, 0.030, choreography_start + 13.86)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 06 [Intro: The Horns Hook]: step_right (13.9s -> 15.8s)
+        # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 13.86): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, -0.030, choreography_start + 15.81)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 07 [Intro: The Horns Hook]: Hello (15.8s -> 20.3s)
+        # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 15.81): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("hello_wave", 4.500, choreography_start + 20.31)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 08 [Verse 1: 'One more time, we're gonna celebrate...']: arm_to_sky (20.3s -> 23.3s)
         # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
         # ======================================================================
-        for _ in range(3):
-            motionProxy.post.angleInterpolation("LArm", arm_angles(20, 45, -60, -80, 0, 0.8), 1.2, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(20, -45, 60, 80, 0, 0.8), 1.2, True)
-            time.sleep(0.3)
-            motionProxy.post.angleInterpolation("LArm", arm_angles(40, 20, -80, -30, -30, 0.5), 1.0, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(20, -10, 40, 60, 30, 0.5), 1.0, True)
-            time.sleep(0.3)
-        postureProxy.goToPosture("StandInit", 0.6)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 20.31): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("arm_to_sky", 3.000, choreography_start + 23.31)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 05 [Verse 1: 'One more time, we're gonna celebrate...']: StandZero (34.5s -> 38.0s)
+        # PASSO 09 [Verse 1: 'One more time, we're gonna celebrate...']: step_left (23.3s -> 25.3s)
         # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
         # ======================================================================
-        postureProxy.goToPosture("StandZero", 0.6)
-        time.sleep(1.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 23.31): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, 0.030, choreography_start + 25.26)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 06 [Chorus 1: First Party Drop]: workout (38.0s -> 50.0s)
+        # PASSO 10 [Verse 1: 'One more time, we're gonna celebrate...']: step_right (25.3s -> 27.2s)
+        # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 25.26): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, -0.030, choreography_start + 27.21)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 11 [Verse 1: 'One more time, we're gonna celebrate...']: step_left (27.2s -> 29.2s)
+        # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 27.21): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, 0.030, choreography_start + 29.16)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 12 [Verse 1: 'One more time, we're gonna celebrate...']: clap (29.2s -> 33.2s)
+        # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 29.16): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("clap", 4.007, choreography_start + 33.17)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 13 [Verse 1: 'One more time, we're gonna celebrate...']: step_right (33.2s -> 35.1s)
+        # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 33.17): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, -0.030, choreography_start + 35.12)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 14 [Verse 1: 'One more time, we're gonna celebrate...']: StandZero (35.1s -> 38.6s)
+        # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 35.12): return
+        if choreography_stop.is_set(): return
+        run_posture_action("StandZero", 0.65, choreography_start + 38.62)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 15 [Chorus 1: First Party Drop]: party_punches (38.6s -> 42.6s)
         # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
         # ======================================================================
-        for _ in range(3):
-            motionProxy.post.angleInterpolation("LArm", arm_angles(-30, 20, -30, -20, 0, 0), 1.2, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(-30, -20, 30, 20, 0, 0), 1.2, True)
-            time.sleep(0.4)
-            motionProxy.post.angleInterpolation("LArm", arm_angles(30, 15, -70, -85, 0, 0.8), 1.2, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(30, -15, 70, 85, 0, 0.8), 1.2, True)
-            time.sleep(0.4)
-        postureProxy.goToPosture("StandInit", 0.6)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 38.62): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("party_punches", 4.007, choreography_start + 42.63)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 07 [Chorus 1: First Party Drop]: macho_man (50.0s -> 54.0s)
+        # PASSO 16 [Chorus 1: First Party Drop]: climax_reach (42.6s -> 46.6s)
         # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
         # ======================================================================
-        biceps_left = arm_angles(25.0, 10.0, -75.0, -80.0, 0.0, 0.8)
-        biceps_right = arm_angles(25.0, -10.0, 75.0, 80.0, 0.0, 0.8)
-        motionProxy.post.angleInterpolation("LArm", biceps_left, 1.5, True)
-        motionProxy.angleInterpolation("RArm", biceps_right, 1.5, True)
-        time.sleep(2.0)
-        postureProxy.goToPosture("StandInit", 0.6)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 42.63): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("climax_reach", 4.007, choreography_start + 46.64)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 08 [Chorus 1: First Party Drop]: Sit (54.0s -> 59.0s)
+        # PASSO 17 [Chorus 1: First Party Drop]: step_left (46.6s -> 48.6s)
         # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
         # ======================================================================
-        postureProxy.goToPosture("Sit", 0.6)
-        time.sleep(1.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 46.64): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, 0.030, choreography_start + 48.59)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 09 [Breakdown: Drums Cut Out ('Music's got me feeling...')]: SitRelax (59.0s -> 63.0s)
+        # PASSO 18 [Chorus 1: First Party Drop]: step_right (48.6s -> 50.5s)
+        # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 48.59): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, -0.030, choreography_start + 50.54)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 19 [Chorus 1: First Party Drop]: step_left (50.5s -> 52.5s)
+        # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 50.54): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, 0.030, choreography_start + 52.49)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 20 [Chorus 1: First Party Drop]: step_right (52.5s -> 54.4s)
+        # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 52.49): return
+        if choreography_stop.is_set(): return
+        run_footwork(0.0, -0.030, choreography_start + 54.44)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 21 [Chorus 1: First Party Drop]: Sit (54.4s -> 59.4s)
+        # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 54.44): return
+        if choreography_stop.is_set(): return
+        run_posture_action("Sit", 0.65, choreography_start + 59.44)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 22 [Breakdown: Drums Cut Out ('Music's got me feeling...')]: SitRelax (59.4s -> 63.4s)
         # Evento Musicale: La cassa si ferma! Atmosfera eterea e sospesa: NAO si rilassa seduto a terra.
         # ======================================================================
-        postureProxy.goToPosture("SitRelax", 0.6)
-        time.sleep(1.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 59.44): return
+        if choreography_stop.is_set(): return
+        run_posture_action("SitRelax", 0.65, choreography_start + 63.44)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 10 [Riser: Snare Roll Buildup]: Stand (63.0s -> 67.5s)
+        # PASSO 23 [Riser: Snare Roll Buildup]: Stand (63.4s -> 67.9s)
         # Evento Musicale: Rullante in crescendo travolgente: NAO scatta in piedi pronto all'esplosione!
         # ======================================================================
-        postureProxy.goToPosture("Stand", 0.6)
-        time.sleep(1.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 63.44): return
+        if choreography_stop.is_set(): return
+        run_posture_action("Stand", 0.65, choreography_start + 67.94)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 11 [Mega Drop & Climax: 'ONE MORE TIME!']: sing_with_me (67.5s -> 81.5s)
+        # PASSO 24 [Mega Drop & Climax: 'ONE MORE TIME!']: arm_to_sky (67.9s -> 70.9s)
         # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
         # ======================================================================
-        neck_left = arm_angles(10.0, 20.0, -80.0, -60.0, 40.0, 0.5)
-        strum_down = arm_angles(60.0, -10.0, 70.0, 85.0, -30.0, 0.8)
-        strum_up = arm_angles(40.0, -15.0, 60.0, 65.0, 20.0, 0.8)
-        motionProxy.post.angleInterpolation("LArm", neck_left, 1.2, True)
-        motionProxy.angleInterpolation("RArm", strum_down, 1.2, True)
-        for _ in range(6):
-            motionProxy.angleInterpolation("RArm", strum_up, 0.45, True)
-            motionProxy.angleInterpolation("RArm", strum_down, 0.45, True)
-        postureProxy.goToPosture("StandInit", 0.6)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 67.94): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("arm_to_sky", 3.000, choreography_start + 70.94)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 12 [Mega Drop & Climax: 'ONE MORE TIME!']: rotation_foot_Rleg (81.5s -> 92.5s)
+        # PASSO 25 [Mega Drop & Climax: 'ONE MORE TIME!']: side_step_groove (70.9s -> 75.0s)
         # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
         # ======================================================================
-        try:
-            motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, -0.05], 3.0, False)
-            time.sleep(2.0)
-        except Exception:
-            time.sleep(5.0)
-        postureProxy.goToPosture("StandInit", 0.5)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 70.94): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("side_step_groove", 4.007, choreography_start + 74.95)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 13 [Mega Drop & Climax: 'ONE MORE TIME!']: double_movement (92.5s -> 100.5s)
+        # PASSO 26 [Mega Drop & Climax: 'ONE MORE TIME!']: seated_arm_to_sky (75.0s -> 79.0s)
         # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
         # ======================================================================
-        time.sleep(8.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 74.95): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("seated_arm_to_sky", 4.007, choreography_start + 78.95)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 14 [Mega Drop & Climax: 'ONE MORE TIME!']: Wipe Forehead (100.5s -> 105.5s)
+        # PASSO 27 [Mega Drop & Climax: 'ONE MORE TIME!']: party_punches (79.0s -> 83.0s)
         # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
         # ======================================================================
-        try:
-            ttsProxy.post.say("Che fatica!")
-        except Exception:
-            pass
-        wipe_reach = arm_angles(-10.0, -25.0, 40.0, 85.0, -40.0, 0.0)
-        wipe_across = arm_angles(-15.0, -20.0, 50.0, 88.0, 20.0, 0.0)
-        motionProxy.angleInterpolation("RArm", wipe_reach, 1.2, True)
-        motionProxy.angleInterpolation("RArm", wipe_across, 1.2, True)
-        time.sleep(0.5)
-        postureProxy.goToPosture("StandInit", 0.6)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 78.95): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("party_punches", 4.007, choreography_start + 82.96)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 15 [Outro: Fade Out & Bow]: arms_opening (105.5s -> 115.5s)
+        # PASSO 28 [Mega Drop & Climax: 'ONE MORE TIME!']: climax_reach (83.0s -> 87.0s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 82.96): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("climax_reach", 4.007, choreography_start + 86.97)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 29 [Mega Drop & Climax: 'ONE MORE TIME!']: arm_wave_combo (87.0s -> 91.0s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 86.97): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("arm_wave_combo", 4.007, choreography_start + 90.97)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 30 [Mega Drop & Climax: 'ONE MORE TIME!']: disco_groove (91.0s -> 95.0s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 90.97): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("disco_groove", 4.007, choreography_start + 94.98)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 31 [Mega Drop & Climax: 'ONE MORE TIME!']: robot_pulse (95.0s -> 99.0s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 94.98): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("robot_pulse", 4.007, choreography_start + 98.99)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 32 [Mega Drop & Climax: 'ONE MORE TIME!']: Wipe Forehead (99.0s -> 104.0s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 98.99): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("wipe_forehead", 5.000, choreography_start + 103.99)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 33 [Outro: Fade Out & Bow]: side_step_groove (104.0s -> 108.0s)
         # Evento Musicale: Il beat sfuma dolcemente: passi d'onore e solenne inchino finale in ginocchio.
         # ======================================================================
-        time.sleep(10.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 103.99): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("side_step_groove", 4.007, choreography_start + 107.99)
+        if choreography_stop.is_set(): return
         # ======================================================================
-        # PASSO 16 [Outro: Fade Out & Bow]: Crouch (115.5s -> 119.5s)
+        # PASSO 34 [Outro: Fade Out & Bow]: arm_wave_combo (108.0s -> 112.0s)
         # Evento Musicale: Il beat sfuma dolcemente: passi d'onore e solenne inchino finale in ginocchio.
         # ======================================================================
-        try:
-            ttsProxy.post.say("Merci Daft Punk!")
-        except Exception:
-            pass
-        postureProxy.goToPosture("Crouch", 0.6)
-        time.sleep(1.0)
+        if choreography_stop.is_set(): return
+        if not wait_until(choreography_start + 107.99): return
+        if choreography_stop.is_set(): return
+        play_dance_phrase("arm_wave_combo", 4.007, choreography_start + 112.00)
+        if choreography_stop.is_set(): return
+        # ======================================================================
+        # PASSO 35 [Outro: Fade Out & Bow]: Crouch (112.0s -> 120.0s)
+        # Evento Musicale: Il beat sfuma dolcemente: passi d'onore e solenne inchino finale in ginocchio.
+        # ======================================================================
+        if not wait_until(choreography_start + crouch_start_time): return
+        crouch_ok = run_posture_action("Crouch", 0.6, choreography_start + choreography_target_time)
+        if not crouch_ok:
+            print("Errore: Crouch non completato entro il limite di 120 secondi.")
+        if not wait_until(choreography_start + choreography_target_time): return
+        choreography_stop.set()
 
-        self.onStopped()
+        deadline_cancel.set()
+        if not deadline_expired.is_set():
+            self.onStopped()
 ]]>
             </content>
         </script>

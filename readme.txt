@@ -7,8 +7,8 @@ STRUTTURA
 File Python principali:
 - main.py: avvia ed esegue il piano. Gestisce connessione NAOqi, tempi e
   conferma manuale per avviare la musica.
-- planner.py: sceglie automaticamente le mosse con A* e genera il progetto
-  Choregraphe. Non contiene una sequenza completa di mosse fissata a mano.
+- planner.py: sceglie le frasi musicali con ricerca A*, ottimizzando
+  ritmo, energia e varietà, e genera il progetto Choregraphe.
 - positions.py: catalogo unico delle azioni, delle durate, delle posture e
   delle transizioni consentite.
 
@@ -19,10 +19,15 @@ Movimenti:
   8 Move_backward; 9 Diagonal_left; 10 Diagonal_right; 11 Stand;
   12 Rotation_foot_RLeg; 13 Rotation_foot_LLeg; 14 StandInit;
   15 StandZero; 16 Sit; 17 SitRelax; 18 Macho_man; 19 Hello;
-  20 Wipe_forehead.
+  20 Wipe_forehead; 21 Arm_to_sky.
+- Il planner inserisce Arm_to_sky all'inizio della prima strofa, sul primo
+  "One more time", e poi prosegue con le altre mosse.
+- Le mosse intermedie sono frasi di braccia e testa su otto battiti, eseguite
+  con traiettorie multi-articolazione simultanee; non riportano il robot in
+  StandInit dopo ogni gesto.
 - RobotPositions/cgrFiles/ contiene le quattro animazioni Choregraphe
   usate come azioni: birthday_dance_no_sound, sing_with_me, sprinkler e workout.
-- music.mp3: colonna sonora One More Time.
+- music.mp3: colonna sonora One More Time, tagliata a 120 secondi.
 
 Progetto Choregraphe:
 - NAO_Choreography_Project/NAO_Choreography.pml: progetto da aprire in
@@ -59,15 +64,36 @@ COME USARLO
    - In Choregraphe, connettersi al robot virtuale.
    - Da un terminale nella cartella del repository eseguire:
        python3 main.py 127.0.0.1 9559
-   - Quando richiesto, avviare One More Time e premere INVIO.
+   - Quando richiesto, premere INVIO: `main.py` avvia `music.mp3` e la
+     coreografia insieme in background tramite `afplay` su macOS.
    - Sostituire IP e porta con i valori mostrati da Choregraphe.
+   - L'esecuzione ha un limite fisso di 120 secondi: gli ultimi 8 secondi
+     (da 112s) sono riservati al Crouch. Se una mossa sfora il proprio intervallo,
+     le mosse successive vengono saltate e il runner passa al Crouch.
+   - Dopo `StandInit`, `disco_groove` parte senza una pausa iniziale aggiunta.
+     Nei primi tre segmenti A* inserisce almeno quattro passi laterali per
+     segmento (due coppie bilanciate); i passi opposti si compensano. Nel
+     Verse è incluso anche il clap.
+   - Il piano è generato dinamicamente con A* dai vincoli musicali, dalle
+     pose obbligatorie e dalle transizioni ammesse; choreography_plan.json
+     è solo un output rigenerabile.
+   - Usa `--no-music` se vuoi avviare la musica manualmente.
 
 4. Simulare solo tempi e piano nel terminale:
        python3 main.py --dry-run
 
-Il pulsante Play di Choregraphe avvia il comportamento .xar; main.py è
-un'esecuzione separata che invia le azioni al robot e richiede di avviare
-la musica manualmente.
+Il pulsante Play verde di Choregraphe avvia il comportamento .xar senza musica.
+Dopo aver rigenerato il progetto con `python3 planner.py`, ricaricare il
+progetto in Choregraphe prima di usare Play, altrimenti si potrebbe eseguire
+la copia del comportamento già caricata in memoria.
+Per sincronizzare musica e robot usa `main.py`. Il comportamento .xar
+generato fa partire il timer appena riceve Play (prima della connessione ai
+proxy), assegna una deadline a ogni mossa, avvia il Crouch al secondo 112 e
+invia onStopped e ALMotion.killAll al secondo 120.
+Il pulsante Stop invia `ALMotion.killAll()` per interrompere subito i movimenti
+attivi. La deadline impedisce al software di continuare oltre 120 secondi,
+ma il raggiungimento fisico della posa dipende dalla risposta del robot e va
+verificato in simulazione prima di usare il robot reale.
 
 
 REQUISITI

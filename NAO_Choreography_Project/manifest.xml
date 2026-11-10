@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<package version="0.0.1" uuid="nao-dance-planning-2026" installOnlyAtStartup="false">
+<package uuid="nao-dance-planning-2026" version="0.0.1" installOnlyAtStartup="false">
  <names>
   <name lang="en_US">NAO Choreography</name>
   <name lang="it_IT">Coreografia NAO</name>
