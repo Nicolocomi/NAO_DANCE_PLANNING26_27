@@ -38,7 +38,8 @@ INTERMEDIATE_POSITIONS = [
     "diagonal_left",         # 1 passo diagonale a sinistra
     "diagonal_right",        # 1 passo diagonale a destra
     "rotation_foot_Lleg",    # Movimento con la gamba/piede sinistro
-    "rotation_foot_Rleg"     # Movimento con la gamba/piede destro
+    "rotation_foot_Rleg",    # Movimento con la gamba/piede destro
+    "macho_man"              # Posa double-biceps con entrambe le braccia
 ]
 
 # Animazioni avanzate da file .crg (importabili in Choregraphe)
@@ -217,6 +218,14 @@ ACTIONS = {
         "type": "intermediate",
         "file": "RobotPositions/12-Rotation_foot_RLeg.py",
         "description": "Rotazione e bilanciamento sulla gamba destra"
+    },
+    "macho_man": {
+        "duration": 4.0,
+        "pre": STANDING,
+        "post": STANDING,
+        "type": "intermediate",
+        "file": "RobotPositions/18-Macho_man.py",
+        "description": "Posa double-biceps con entrambe le braccia e ritorno in posizione neutra"
     },
 
     # --- ANIMAZIONI DA FILE .CRG ---
