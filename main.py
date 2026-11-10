@@ -18,7 +18,6 @@ import sys
 import time
 
 import planner
-import positions
 
 # Tentativo di importazione di NAOqi (presente nell'ambiente Choregraphe/Python 2.7)
 try:
@@ -190,4 +189,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
