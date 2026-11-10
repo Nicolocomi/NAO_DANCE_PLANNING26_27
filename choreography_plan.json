@@ -1,0 +1,205 @@
+{
+  "steps": [
+    {
+      "step": 1,
+      "action": "StandInit",
+      "type": "start",
+      "posture": "STANDING",
+      "start_time": 0.0,
+      "duration": 4.0,
+      "end_time": 4.0,
+      "file": "RobotPositions/14-StandInit.py",
+      "description": "Posizione eretta iniziale con braccia avanzate"
+    },
+    {
+      "step": 2,
+      "action": "birthday_dance",
+      "type": "crg",
+      "posture": "STANDING",
+      "start_time": 4.0,
+      "duration": 15.0,
+      "end_time": 19.0,
+      "file": "RobotPositions/cgrFiles/birthday_dance_no_sound.crg",
+      "description": "Coreografia di compleanno"
+    },
+    {
+      "step": 3,
+      "action": "Hello",
+      "type": "mandatory",
+      "posture": "STANDING",
+      "start_time": 19.0,
+      "duration": 4.5,
+      "end_time": 23.5,
+      "file": "box:Animations/Hello",
+      "description": "Gesto di saluto con la mano (box Choregraphe)"
+    },
+    {
+      "step": 4,
+      "action": "sing_with_me",
+      "type": "crg",
+      "posture": "STANDING",
+      "start_time": 23.5,
+      "duration": 14.0,
+      "end_time": 37.5,
+      "file": "RobotPositions/cgrFiles/sing_with_me.crg",
+      "description": "NAO simula di suonare la chitarra"
+    },
+    {
+      "step": 5,
+      "action": "move_forward",
+      "type": "intermediate",
+      "posture": "STANDING",
+      "start_time": 37.5,
+      "duration": 4.0,
+      "end_time": 41.5,
+      "file": "RobotPositions/7-Move_forward.py",
+      "description": "3 passi in avanti"
+    },
+    {
+      "step": 6,
+      "action": "StandZero",
+      "type": "mandatory",
+      "posture": "STANDING",
+      "start_time": 41.5,
+      "duration": 3.5,
+      "end_time": 45.0,
+      "file": "RobotPositions/15-StandZero.py",
+      "description": "Posizione in piedi con braccia distese in avanti"
+    },
+    {
+      "step": 7,
+      "action": "workout",
+      "type": "crg",
+      "posture": "STANDING",
+      "start_time": 45.0,
+      "duration": 12.0,
+      "end_time": 57.0,
+      "file": "RobotPositions/cgrFiles/workout.crg",
+      "description": "Sequenza di esercizi ginnici"
+    },
+    {
+      "step": 8,
+      "action": "move_backward",
+      "type": "intermediate",
+      "posture": "STANDING",
+      "start_time": 57.0,
+      "duration": 4.0,
+      "end_time": 61.0,
+      "file": "RobotPositions/8-Move_backward.py",
+      "description": "3 passi all'indietro"
+    },
+    {
+      "step": 9,
+      "action": "Sit",
+      "type": "mandatory",
+      "posture": "SITTING",
+      "start_time": 61.0,
+      "duration": 5.0,
+      "end_time": 66.0,
+      "file": "RobotPositions/16-Sit.py",
+      "description": "Il robot passa dalla posizione in piedi a seduta"
+    },
+    {
+      "step": 10,
+      "action": "SitRelax",
+      "type": "mandatory",
+      "posture": "SITTING",
+      "start_time": 66.0,
+      "duration": 4.0,
+      "end_time": 70.0,
+      "file": "RobotPositions/17-SitRelax.py",
+      "description": "Il robot si rilassa rimanendo seduto"
+    },
+    {
+      "step": 11,
+      "action": "Stand",
+      "type": "mandatory",
+      "posture": "STANDING",
+      "start_time": 70.0,
+      "duration": 4.5,
+      "end_time": 74.5,
+      "file": "RobotPositions/11-Stand.py",
+      "description": "Il robot si rialza in piedi dalla posizione seduta"
+    },
+    {
+      "step": 12,
+      "action": "rotation_foot_Lleg",
+      "type": "intermediate",
+      "posture": "STANDING",
+      "start_time": 74.5,
+      "duration": 11.0,
+      "end_time": 85.5,
+      "file": "RobotPositions/13-Rotation_foot_LLeg.py",
+      "description": "Rotazione e bilanciamento sulla gamba sinistra"
+    },
+    {
+      "step": 13,
+      "action": "rotation_foot_Rleg",
+      "type": "intermediate",
+      "posture": "STANDING",
+      "start_time": 85.5,
+      "duration": 11.0,
+      "end_time": 96.5,
+      "file": "RobotPositions/12-Rotation_foot_RLeg.py",
+      "description": "Rotazione e bilanciamento sulla gamba destra"
+    },
+    {
+      "step": 14,
+      "action": "Wipe Forehead",
+      "type": "mandatory",
+      "posture": "STANDING",
+      "start_time": 96.5,
+      "duration": 5.0,
+      "end_time": 101.5,
+      "file": "box:Animations/Wipe Forehead",
+      "description": "Gesto di asciugarsi la fronte (box Choregraphe)"
+    },
+    {
+      "step": 15,
+      "action": "right_arm",
+      "type": "intermediate",
+      "posture": "STANDING",
+      "start_time": 101.5,
+      "duration": 10.0,
+      "end_time": 111.5,
+      "file": "RobotPositions/2-Right_arm.py",
+      "description": "Rotazione completa del braccio destro sopra la testa"
+    },
+    {
+      "step": 16,
+      "action": "diagonal_left",
+      "type": "intermediate",
+      "posture": "STANDING",
+      "start_time": 111.5,
+      "duration": 4.0,
+      "end_time": 115.5,
+      "file": "RobotPositions/9-Diagonal_left.py",
+      "description": "Passo diagonale a sinistra"
+    },
+    {
+      "step": 17,
+      "action": "Crouch",
+      "type": "goal",
+      "posture": "CROUCHING",
+      "start_time": 115.5,
+      "duration": 4.0,
+      "end_time": 119.5,
+      "file": "RobotPositions/6-Crouch.py",
+      "description": "Posizione finale rannicchiata / in ginocchio"
+    }
+  ],
+  "total_time": 119.5,
+  "distinct_intermediates": [
+    "birthday_dance",
+    "diagonal_left",
+    "move_backward",
+    "move_forward",
+    "right_arm",
+    "rotation_foot_Lleg",
+    "rotation_foot_Rleg",
+    "sing_with_me",
+    "workout"
+  ],
+  "is_time_ok": true,
+  "is_variety_ok": true
+}
