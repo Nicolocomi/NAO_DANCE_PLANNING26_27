@@ -3,7 +3,7 @@ main.py - Esecutore della Coreografia per il Robot Umanoide NAO.
 Fundamentals of Artificial Intelligence - NAO Planning Competition (UniBo)
 
 Uso:
-    python main.py [ROBOT_IP] [PORT] [--dry-run] [--no-music]
+    python main.py [ROBOT_IP] [PORT] [--dry-run]
 
 Esempi:
     python main.py 127.0.0.1 9559            # Esecuzione standard con Choregraphe
@@ -15,7 +15,6 @@ import argparse
 import os
 import subprocess
 import sys
-import threading
 import time
 
 import planner
@@ -28,41 +27,6 @@ try:
 except ImportError:
     ALProxy = None
     NAOQI_AVAILABLE = False
-
-
-# ==============================================================================
-# GESTIONE DELLA RIPRODUZIONE MUSICALE
-# ==============================================================================
-def play_audio_background(music_path):
-    """
-    Riproduce la musica in background su un thread separato
-    utilizzando il comando nativo del sistema operativo (macOS, Linux, Windows).
-    """
-    if not os.path.isfile(music_path):
-        return
-
-    def _play():
-        try:
-            if sys.platform == "darwin":  # macOS
-                subprocess.call(["afplay", music_path])
-            elif sys.platform.startswith("linux"):  # Linux
-                # Prova i riproduttori comuni da terminale
-                for player in ["aplay", "mpg123", "paplay", "ffplay"]:
-                    if subprocess.call(["which", player], stdout=subprocess.PIPE, stderr=subprocess.PIPE) == 0:
-                        subprocess.call([player, music_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        break
-            elif sys.platform == "win32":  # Windows
-                import winsound
-                if music_path.lower().endswith(".wav"):
-                    winsound.PlaySound(music_path, winsound.SND_FILENAME)
-                else:
-                    os.system('start /min wmplayer "%s"' % music_path)
-        except Exception as e:
-            print("[AUDIO] Impossibile avviare riproduzione automatica: %s" % e)
-
-    t = threading.Thread(target=_play)
-    t.daemon = True
-    t.start()
 
 
 # ==============================================================================
@@ -153,8 +117,6 @@ def main():
     parser.add_argument("robot_ip", nargs="?", default="127.0.0.1", help="Indirizzo IP del robot (default: 127.0.0.1)")
     parser.add_argument("port", nargs="?", type=int, default=9559, help="Porta NAOqi (default: 9559 o 61476)")
     parser.add_argument("--dry-run", action="store_true", help="Esegui simulazione temporale senza connettersi al robot reale")
-    parser.add_argument("--no-music", action="store_true", help="Disabilita la riproduzione musicale automatica")
-    parser.add_argument("--music", default="music.mp3", help="Percorso del file audio mp3/wav (default: music.mp3)")
     parser.add_argument("--target-time", type=float, default=120.0, help="Durata complessiva desiderata in secondi (default: 120.0)")
 
     args = parser.parse_args()
@@ -194,12 +156,9 @@ def main():
     else:
         print("\n[2/3] Modalita' simulazione attiva (Dry-Run).")
 
-    # 3. Avvio della musica
-    if not args.no_music and os.path.isfile(args.music):
-        print("\n[3/3] Avvio riproduzione musicale: %s" % args.music)
-        play_audio_background(args.music)
-    else:
-        print("\n[3/3] Riproduzione musicale non attiva (file '%s' non trovato o opzione --no-music)." % args.music)
+    # 3. Avvio esecuzione
+    print("\n[3/3] Fai partire la musica dal telefono e premi INVIO per iniziare...")
+    sys.stdin.readline()
 
     print("\n" + "#" * 80)
     print("        INIZIO COREOGRAFIA NAO - SINCRONIZZAZIONE AL SECONDO ZERO")

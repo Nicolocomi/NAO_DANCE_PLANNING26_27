@@ -1,7 +1,16 @@
 """
-choreography_choregraphe_box.py - Codice per il Box Python di Choregraphe.
-Copia e incolla questo codice all'interno di un 'Python Box' in Choregraphe
-per vedere NAO eseguire l'intera coreografia di 2 minuti nel visualizzatore 3D!
+choreography_choregraphe_box.py
+
+Codice Python da usare dentro una Python Box in Choregraphe 2.8.
+Generato automaticamente da planner.py.
+
+NOTA: La musica va avviata ESTERNAMENTE (da main.py o manualmente
+con qualsiasi lettore audio). NON si deve mai usare subprocess/os
+dentro Choregraphe.
+
+Incolla questo codice nel box 'Script' di Choregraphe,
+oppure usa il progetto NAO_Choreography_Project/NAO_Choreography.pml
+che è già pronto.
 """
 
 import math
@@ -11,7 +20,6 @@ try:
     from naoqi import ALProxy
 except ImportError:
     pass
-
 
 class MyClass(GeneratedClass):
     def __init__(self):
@@ -23,8 +31,14 @@ class MyClass(GeneratedClass):
     def onUnload(self):
         pass
 
+    def onInput_onStop(self):
+        self.onUnload()
+        self.onStopped()
+
     def onInput_onStart(self):
-        # 1. Inizializzazione Proxy
+        # NOTA: La musica va avviata ESTERNAMENTE (da main.py o manualmente).
+        # NON usare subprocess/os dentro Choregraphe: crasha il simulatore.
+
         try:
             motionProxy = ALProxy("ALMotion")
             postureProxy = ALProxy("ALRobotPosture")
@@ -44,41 +58,30 @@ class MyClass(GeneratedClass):
                 hand
             ]
 
-        # ----------------------------------------------------------------------
-        # PASSO 1: StandInit (0.0s -> 4.0s)
-        # ----------------------------------------------------------------------
+        # ======================================================================
+        # PASSO 01 [Inizio]: StandInit (0.0s -> 4.0s)
+        # Evento Musicale: NAO in attesa del primo beat.
+        # ======================================================================
         try:
-            ttsProxy.post.say("Musica maestro!")
+            ttsProxy.post.say("One more time!")
         except Exception:
             pass
         postureProxy.goToPosture("StandInit", 0.6)
         time.sleep(1.0)
-
-        # ----------------------------------------------------------------------
-        # PASSO 2: Birthday Dance (Braccia danzanti) (4.0s -> 19.0s)
-        # ----------------------------------------------------------------------
-        # Danza festosa con movimenti alternati e ritmati delle braccia
-        for _ in range(3):
-            # Braccia aperte in alto
-            motionProxy.post.angleInterpolation("LArm", arm_angles(20, 45, -60, -80, 0, 0.8), 1.2, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(20, -45, 60, 80, 0, 0.8), 1.2, True)
-            time.sleep(0.3)
-            # Braccia ondeggianti a sinistra
-            motionProxy.post.angleInterpolation("LArm", arm_angles(40, 20, -80, -30, -30, 0.5), 1.0, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(20, -10, 40, 60, 30, 0.5), 1.0, True)
-            time.sleep(0.3)
-            # Braccia ondeggianti a destra
-            motionProxy.post.angleInterpolation("LArm", arm_angles(20, 10, -40, -60, -30, 0.5), 1.0, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(40, -20, 80, 30, 30, 0.5), 1.0, True)
-            time.sleep(0.3)
-
-        # ----------------------------------------------------------------------
-        # PASSO 3: Hello (19.0s -> 23.5s) - POSIZIONE OBBLIGATORIA
-        # ----------------------------------------------------------------------
+        # ======================================================================
+        # PASSO 02 [Intro: The Horns Hook]: rotation_foot_Lleg (4.0s -> 15.0s)
+        # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
+        # ======================================================================
         try:
-            ttsProxy.post.say("Ciao a tutti!")
+            motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, 0.05], 3.0, False)
+            time.sleep(2.0)
         except Exception:
-            pass
+            time.sleep(5.0)
+        postureProxy.goToPosture("StandInit", 0.5)
+        # ======================================================================
+        # PASSO 03 [Intro: The Horns Hook]: Hello (15.0s -> 19.5s)
+        # Evento Musicale: Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.
+        # ======================================================================
         wave_up = arm_angles(-25.0, -20.0, 70.0, 65.0, 20.0, 1.0)
         wave_left = arm_angles(-25.0, -20.0, 70.0, 45.0, -20.0, 1.0)
         wave_right = arm_angles(-25.0, -20.0, 70.0, 80.0, 40.0, 1.0)
@@ -87,11 +90,68 @@ class MyClass(GeneratedClass):
             motionProxy.angleInterpolation("RArm", wave_left, 0.35, True)
             motionProxy.angleInterpolation("RArm", wave_right, 0.35, True)
         postureProxy.goToPosture("StandInit", 0.6)
-
-        # ----------------------------------------------------------------------
-        # PASSO 4: Sing With Me (Chitarra Rock) (23.5s -> 37.5s)
-        # ----------------------------------------------------------------------
-        # Mano sinistra tiene il manico, mano destra plettra a tempo di rock
+        # ======================================================================
+        # PASSO 04 [Verse 1: 'One more time, we're gonna celebrate...']: birthday_dance (19.5s -> 34.5s)
+        # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
+        # ======================================================================
+        for _ in range(3):
+            motionProxy.post.angleInterpolation("LArm", arm_angles(20, 45, -60, -80, 0, 0.8), 1.2, True)
+            motionProxy.angleInterpolation("RArm", arm_angles(20, -45, 60, 80, 0, 0.8), 1.2, True)
+            time.sleep(0.3)
+            motionProxy.post.angleInterpolation("LArm", arm_angles(40, 20, -80, -30, -30, 0.5), 1.0, True)
+            motionProxy.angleInterpolation("RArm", arm_angles(20, -10, 40, 60, 30, 0.5), 1.0, True)
+            time.sleep(0.3)
+        postureProxy.goToPosture("StandInit", 0.6)
+        # ======================================================================
+        # PASSO 05 [Verse 1: 'One more time, we're gonna celebrate...']: StandZero (34.5s -> 38.0s)
+        # Evento Musicale: Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.
+        # ======================================================================
+        postureProxy.goToPosture("StandZero", 0.6)
+        time.sleep(1.0)
+        # ======================================================================
+        # PASSO 06 [Chorus 1: First Party Drop]: workout (38.0s -> 50.0s)
+        # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
+        # ======================================================================
+        for _ in range(3):
+            motionProxy.post.angleInterpolation("LArm", arm_angles(-30, 20, -30, -20, 0, 0), 1.2, True)
+            motionProxy.angleInterpolation("RArm", arm_angles(-30, -20, 30, 20, 0, 0), 1.2, True)
+            time.sleep(0.4)
+            motionProxy.post.angleInterpolation("LArm", arm_angles(30, 15, -70, -85, 0, 0.8), 1.2, True)
+            motionProxy.angleInterpolation("RArm", arm_angles(30, -15, 70, 85, 0, 0.8), 1.2, True)
+            time.sleep(0.4)
+        postureProxy.goToPosture("StandInit", 0.6)
+        # ======================================================================
+        # PASSO 07 [Chorus 1: First Party Drop]: macho_man (50.0s -> 54.0s)
+        # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
+        # ======================================================================
+        biceps_left = arm_angles(25.0, 10.0, -75.0, -80.0, 0.0, 0.8)
+        biceps_right = arm_angles(25.0, -10.0, 75.0, 80.0, 0.0, 0.8)
+        motionProxy.post.angleInterpolation("LArm", biceps_left, 1.5, True)
+        motionProxy.angleInterpolation("RArm", biceps_right, 1.5, True)
+        time.sleep(2.0)
+        postureProxy.goToPosture("StandInit", 0.6)
+        # ======================================================================
+        # PASSO 08 [Chorus 1: First Party Drop]: Sit (54.0s -> 59.0s)
+        # Evento Musicale: Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.
+        # ======================================================================
+        postureProxy.goToPosture("Sit", 0.6)
+        time.sleep(1.0)
+        # ======================================================================
+        # PASSO 09 [Breakdown: Drums Cut Out ('Music's got me feeling...')]: SitRelax (59.0s -> 63.0s)
+        # Evento Musicale: La cassa si ferma! Atmosfera eterea e sospesa: NAO si rilassa seduto a terra.
+        # ======================================================================
+        postureProxy.goToPosture("SitRelax", 0.6)
+        time.sleep(1.0)
+        # ======================================================================
+        # PASSO 10 [Riser: Snare Roll Buildup]: Stand (63.0s -> 67.5s)
+        # Evento Musicale: Rullante in crescendo travolgente: NAO scatta in piedi pronto all'esplosione!
+        # ======================================================================
+        postureProxy.goToPosture("Stand", 0.6)
+        time.sleep(1.0)
+        # ======================================================================
+        # PASSO 11 [Mega Drop & Climax: 'ONE MORE TIME!']: sing_with_me (67.5s -> 81.5s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
         neck_left = arm_angles(10.0, 20.0, -80.0, -60.0, 40.0, 0.5)
         strum_down = arm_angles(60.0, -10.0, 70.0, 85.0, -30.0, 0.8)
         strum_up = arm_angles(40.0, -15.0, 60.0, 65.0, 20.0, 0.8)
@@ -101,80 +161,25 @@ class MyClass(GeneratedClass):
             motionProxy.angleInterpolation("RArm", strum_up, 0.45, True)
             motionProxy.angleInterpolation("RArm", strum_down, 0.45, True)
         postureProxy.goToPosture("StandInit", 0.6)
-
-        # ----------------------------------------------------------------------
-        # PASSO 5: Move Forward (37.5s -> 41.5s)
-        # ----------------------------------------------------------------------
+        # ======================================================================
+        # PASSO 12 [Mega Drop & Climax: 'ONE MORE TIME!']: rotation_foot_Rleg (81.5s -> 92.5s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
         try:
-            motionProxy.moveTo(0.12, 0.0, 0.0)
+            motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, -0.05], 3.0, False)
+            time.sleep(2.0)
         except Exception:
-            time.sleep(4.0)
-
-        # ----------------------------------------------------------------------
-        # PASSO 6: StandZero (41.5s -> 45.0s) - POSIZIONE OBBLIGATORIA
-        # ----------------------------------------------------------------------
-        postureProxy.goToPosture("StandZero", 0.6)
-        time.sleep(1.5)
-
-        # ----------------------------------------------------------------------
-        # PASSO 7: Workout (Ginnastica ritmica) (45.0s -> 57.0s)
-        # ----------------------------------------------------------------------
-        # Movimento di allenamento su e giù con entrambe le braccia
-        for _ in range(3):
-            # Push-up in alto
-            motionProxy.post.angleInterpolation("LArm", arm_angles(-30, 20, -30, -20, 0, 0), 1.2, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(-30, -20, 30, 20, 0, 0), 1.2, True)
-            time.sleep(0.4)
-            # Bicipiti flessi
-            motionProxy.post.angleInterpolation("LArm", arm_angles(30, 15, -70, -85, 0, 0.8), 1.2, True)
-            motionProxy.angleInterpolation("RArm", arm_angles(30, -15, 70, 85, 0, 0.8), 1.2, True)
-            time.sleep(0.4)
-        postureProxy.goToPosture("StandInit", 0.6)
-
-        # ----------------------------------------------------------------------
-        # PASSO 8: Move Backward (57.0s -> 61.0s)
-        # ----------------------------------------------------------------------
-        try:
-            motionProxy.moveTo(-0.12, 0.0, 0.0)
-        except Exception:
-            time.sleep(4.0)
-
-        # ----------------------------------------------------------------------
-        # PASSO 9: Sit (61.0s -> 66.0s) - POSIZIONE OBBLIGATORIA
-        # ----------------------------------------------------------------------
-        postureProxy.goToPosture("Sit", 0.6)
-        time.sleep(1.0)
-
-        # ----------------------------------------------------------------------
-        # PASSO 10: SitRelax (66.0s -> 70.0s) - POSIZIONE OBBLIGATORIA
-        # ----------------------------------------------------------------------
-        postureProxy.goToPosture("SitRelax", 0.6)
-        time.sleep(1.5)
-
-        # ----------------------------------------------------------------------
-        # PASSO 11: Stand (70.0s -> 74.5s) - POSIZIONE OBBLIGATORIA
-        # ----------------------------------------------------------------------
-        postureProxy.goToPosture("Stand", 0.6)
-        time.sleep(1.0)
-
-        # ----------------------------------------------------------------------
-        # PASSO 12: Rotation Foot LLeg (74.5s -> 85.5s)
-        # ----------------------------------------------------------------------
-        # Rotazione espressiva del busto e bilanciamento
-        motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, 0.05], 3.0, False)
-        time.sleep(2.0)
+            time.sleep(5.0)
         postureProxy.goToPosture("StandInit", 0.5)
-
-        # ----------------------------------------------------------------------
-        # PASSO 13: Rotation Foot RLeg (85.5s -> 96.5s)
-        # ----------------------------------------------------------------------
-        motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, -0.05], 3.0, False)
-        time.sleep(2.0)
-        postureProxy.goToPosture("StandInit", 0.5)
-
-        # ----------------------------------------------------------------------
-        # PASSO 14: Wipe Forehead (96.5s -> 101.5s) - POSIZIONE OBBLIGATORIA
-        # ----------------------------------------------------------------------
+        # ======================================================================
+        # PASSO 13 [Mega Drop & Climax: 'ONE MORE TIME!']: double_movement (92.5s -> 100.5s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
+        time.sleep(8.0)
+        # ======================================================================
+        # PASSO 14 [Mega Drop & Climax: 'ONE MORE TIME!']: Wipe Forehead (100.5s -> 105.5s)
+        # Evento Musicale: Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.
+        # ======================================================================
         try:
             ttsProxy.post.say("Che fatica!")
         except Exception:
@@ -185,39 +190,20 @@ class MyClass(GeneratedClass):
         motionProxy.angleInterpolation("RArm", wipe_across, 1.2, True)
         time.sleep(0.5)
         postureProxy.goToPosture("StandInit", 0.6)
-
-        # ----------------------------------------------------------------------
-        # PASSO 15: Right Arm Disco (101.5s -> 107.5s)
-        # ----------------------------------------------------------------------
-        # Rotazione spettacolare del braccio sopra la testa stile disco dance
-        r_up = arm_angles(-60.0, -40.0, 80.0, 20.0, 0.0, 0.9)
-        r_circle = arm_angles(-40.0, -60.0, 60.0, 50.0, 40.0, 0.9)
-        motionProxy.angleInterpolation("RArm", r_up, 1.5, True)
-        motionProxy.angleInterpolation("RArm", r_circle, 1.5, True)
-        postureProxy.goToPosture("StandInit", 0.6)
-
-        # ----------------------------------------------------------------------
-        # PASSO 16: Macho Man Biceps Pose! (107.5s -> 114.5s)
-        # ----------------------------------------------------------------------
-        # La mossa speciale Macho Man: flette entrambi i bicipiti con orgoglio
-        biceps_left = arm_angles(25.0, 10.0, -75.0, -80.0, 0.0, 0.8)
-        biceps_right = arm_angles(25.0, -10.0, 75.0, 80.0, 0.0, 0.8)
-        motionProxy.post.angleInterpolation("LArm", biceps_left, 1.5, True)
-        motionProxy.angleInterpolation("RArm", biceps_right, 1.5, True)
-        time.sleep(2.5)  # Tiene la posa per il pubblico!
-        postureProxy.goToPosture("StandInit", 0.6)
-
-        # ----------------------------------------------------------------------
-        # PASSO 17: Crouch (114.5s -> 119.5s) - POSIZIONE OBIETTIVO (GOAL)
-        # ----------------------------------------------------------------------
-        # Inchino finale e chiusura
+        # ======================================================================
+        # PASSO 15 [Outro: Fade Out & Bow]: arms_opening (105.5s -> 115.5s)
+        # Evento Musicale: Il beat sfuma dolcemente: passi d'onore e solenne inchino finale in ginocchio.
+        # ======================================================================
+        time.sleep(10.0)
+        # ======================================================================
+        # PASSO 16 [Outro: Fade Out & Bow]: Crouch (115.5s -> 119.5s)
+        # Evento Musicale: Il beat sfuma dolcemente: passi d'onore e solenne inchino finale in ginocchio.
+        # ======================================================================
         try:
-            ttsProxy.post.say("Grazie a tutti!")
+            ttsProxy.post.say("Merci Daft Punk!")
         except Exception:
             pass
         postureProxy.goToPosture("Crouch", 0.6)
         time.sleep(1.0)
 
-        # Fine della coreografia
         self.onStopped()
-

@@ -1,6 +1,7 @@
 """
 positions.py - Modellazione dello Spazio degli Stati, Azioni e Vincoli per NAO.
 Fundamentals of Artificial Intelligence - NAO Planning Competition (UniBo)
+Ottimizzato per la sincronizzazione musicale con Daft Punk - 'One More Time' (123 BPM)
 """
 
 # ==============================================================================
@@ -52,10 +53,11 @@ CRG_ANIMATIONS = [
 ]
 
 # ==============================================================================
-# 3. CATALOGO COMPLETO DELLE AZIONI (METADATI, DURATE E POSTURE)
+# 3. CATALOGO COMPLETO DELLE AZIONI (METADATI, DURATE, ENERGIA E POSTURE)
 # ==============================================================================
 # Ogni azione specifica:
 # - 'duration': durata stimata di esecuzione (in secondi)
+# - 'energy': livello energetico da 1 (calmo/a terra) a 5 (massimo dinamismo/climax)
 # - 'pre': postura richiesta prima dell'esecuzione (None = applicabile sempre)
 # - 'post': postura risultante dopo l'esecuzione
 # - 'type': tipologia ('start', 'goal', 'mandatory', 'intermediate', 'crg')
@@ -65,24 +67,27 @@ ACTIONS = {
     # --- STATO INIZIALE & GOAL ---
     "StandInit": {
         "duration": 4.0,
+        "energy": 2,
         "pre": None,
         "post": STANDING,
         "type": "start",
         "file": "RobotPositions/14-StandInit.py",
-        "description": "Posizione eretta iniziale con braccia avanzate"
+        "description": "Posizione eretta iniziale con braccia avanzate (risveglio)"
     },
     "Crouch": {
         "duration": 4.0,
+        "energy": 1,
         "pre": STANDING,
         "post": CROUCHING,
         "type": "goal",
         "file": "RobotPositions/6-Crouch.py",
-        "description": "Posizione finale rannicchiata / in ginocchio"
+        "description": "Inchino finale rannicchiato / in ginocchio (chiusura)"
     },
 
     # --- POSIZIONI OBBLIGATORIE (MANDATORY) ---
     "Sit": {
         "duration": 5.0,
+        "energy": 1,
         "pre": STANDING,
         "post": SITTING,
         "type": "mandatory",
@@ -91,154 +96,173 @@ ACTIONS = {
     },
     "SitRelax": {
         "duration": 4.0,
+        "energy": 1,
         "pre": SITTING,
         "post": SITTING,
         "type": "mandatory",
         "file": "RobotPositions/17-SitRelax.py",
-        "description": "Il robot si rilassa rimanendo seduto"
+        "description": "Il robot si rilassa rimanendo seduto (breakdown musicale)"
     },
     "Stand": {
         "duration": 4.5,
+        "energy": 3,
         "pre": SITTING,
         "post": STANDING,
         "type": "mandatory",
         "file": "RobotPositions/11-Stand.py",
-        "description": "Il robot si rialza in piedi dalla posizione seduta"
+        "description": "Il robot si rialza in piedi con energia (snare riser)"
     },
     "StandZero": {
         "duration": 3.5,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "mandatory",
         "file": "RobotPositions/15-StandZero.py",
-        "description": "Posizione in piedi con braccia distese in avanti"
+        "description": "Posa scenica in piedi con braccia distese in avanti"
     },
     "Wipe Forehead": {
         "duration": 5.0,
+        "energy": 2,
         "pre": STANDING,
         "post": STANDING,
         "type": "mandatory",
-        "file": "box:Animations/Wipe Forehead",
-        "description": "Gesto di asciugarsi la fronte (box Choregraphe)"
+        "file": "RobotPositions/20-Wipe_forehead.py",
+        "description": "Gesto di asciugarsi la fronte per la fatica dopo il ballo"
     },
     "Hello": {
         "duration": 4.5,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "mandatory",
-        "file": "box:Animations/Hello",
-        "description": "Gesto di saluto con la mano (box Choregraphe)"
+        "file": "RobotPositions/19-Hello.py",
+        "description": "Gesto di saluto con la mano destra al pubblico"
     },
 
     # --- POSIZIONI INTERMEDIE (INTERMEDIATE) ---
     "rotation_handgun": {
         "duration": 8.0,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/1-Rotation_handgun_object.py",
-        "description": "Movimento del braccio che regge il ventaglio/oggetto"
+        "description": "Movimento ritmico con il braccio e l'oggetto"
     },
     "right_arm": {
         "duration": 10.0,
+        "energy": 4,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/2-Right_arm.py",
-        "description": "Rotazione completa del braccio destro sopra la testa"
+        "description": "Rotazione disco-funk del braccio destro sopra la testa"
     },
     "double_movement": {
         "duration": 8.0,
+        "energy": 4,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/3-Double_movement.py",
-        "description": "Movimento coordinato con entrambe le braccia"
+        "description": "Movimento sincrono ed energico con entrambe le braccia"
     },
     "arms_opening": {
         "duration": 10.0,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/4-Arms_opening.py",
-        "description": "Apertura e rotazione simultanea delle braccia"
+        "description": "Apertura solenne e rotazione simultanea delle braccia"
     },
     "union_arms": {
         "duration": 9.0,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/5-Union_arms.py",
-        "description": "Gesto di unione delle due braccia al centro"
+        "description": "Gesto di unione delle braccia al centro del petto"
     },
     "move_forward": {
         "duration": 4.0,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/7-Move_forward.py",
-        "description": "3 passi in avanti"
+        "description": "3 passi a tempo in avanti verso la platea"
     },
     "move_backward": {
         "duration": 4.0,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/8-Move_backward.py",
-        "description": "3 passi all'indietro"
+        "description": "3 passi ritmati all'indietro tornando al centro"
     },
     "diagonal_left": {
         "duration": 4.0,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/9-Diagonal_left.py",
-        "description": "Passo diagonale a sinistra"
+        "description": "Passo diagonale scenografico a sinistra"
     },
     "diagonal_right": {
         "duration": 4.0,
+        "energy": 3,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/10-Diagonal_right.py",
-        "description": "Passo diagonale a destra"
+        "description": "Passo diagonale scenografico a destra"
     },
     "rotation_foot_Lleg": {
         "duration": 11.0,
+        "energy": 4,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/13-Rotation_foot_LLeg.py",
-        "description": "Rotazione e bilanciamento sulla gamba sinistra"
+        "description": "Footwork ritmico e bilanciamento sulla gamba sinistra"
     },
     "rotation_foot_Rleg": {
         "duration": 11.0,
+        "energy": 4,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/12-Rotation_foot_RLeg.py",
-        "description": "Rotazione e bilanciamento sulla gamba destra"
+        "description": "Footwork ritmico e bilanciamento sulla gamba destra"
     },
     "macho_man": {
         "duration": 4.0,
+        "energy": 5,
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/18-Macho_man.py",
-        "description": "Posa double-biceps con entrambe le braccia e ritorno in posizione neutra"
+        "description": "Posa double-biceps: flette i muscoli con fierezza al culmine del drop!"
     },
 
     # --- ANIMAZIONI DA FILE .CRG ---
     "sing_with_me": {
         "duration": 14.0,
+        "energy": 5,
         "pre": STANDING,
         "post": STANDING,
         "type": "crg",
         "file": "RobotPositions/cgrFiles/sing_with_me.crg",
-        "description": "NAO simula di suonare la chitarra"
+        "description": "Chitarra elettrica Daft Punk: plettrata ritmata sul campionamento rock"
     },
     "arm_dance": {
         "duration": 10.0,
+        "energy": 4,
         "pre": STANDING,
         "post": STANDING,
         "type": "crg",
@@ -247,38 +271,38 @@ ACTIONS = {
     },
     "birthday_dance": {
         "duration": 15.0,
+        "energy": 4,
         "pre": STANDING,
         "post": STANDING,
         "type": "crg",
         "file": "RobotPositions/cgrFiles/birthday_dance_no_sound.crg",
-        "description": "Coreografia di compleanno"
+        "description": "Danza festosa a tutto corpo: ideale per il ritornello"
     },
     "sprinkler": {
         "duration": 8.0,
+        "energy": 4,
         "pre": STANDING,
         "post": STANDING,
         "type": "crg",
         "file": "RobotPositions/cgrFiles/sprinkler.crg",
-        "description": "Mossa della danza sprinkler"
+        "description": "Mossa della danza sprinkler a tempo di beat"
     },
     "workout": {
         "duration": 12.0,
+        "energy": 5,
         "pre": STANDING,
         "post": STANDING,
         "type": "crg",
         "file": "RobotPositions/cgrFiles/workout.crg",
-        "description": "Sequenza di esercizi ginnici"
+        "description": "Aerobica ad altissima energia sul drop del ritornello"
     }
 }
 
 # ==============================================================================
-# 4. INCOMPATIBILITÀ ESPLICITE (Transizioni vietate nel simulatore)
+# 4. INCOMPATIBILITÀ ESPLICITE
 # ==============================================================================
-# Oltre al controllo della postura (es. niente passi da seduti),
-# queste coppie consecutive (da -> a) provocano problemi di stabilità, cadute o
-# contraddizioni fisiche/cinematiche nel simulatore Choregraphe.
-INCOMPATIBILITIES = {
-    # Non eseguire passi opposti consecutivi (annullamento estetico poco fluido)
+EXPLICIT_INCOMPATIBILITIES = {
+    # Non eseguire passi opposti consecutivi
     ("move_forward", "move_backward"),
     ("move_backward", "move_forward"),
     ("diagonal_left", "diagonal_right"),
@@ -288,22 +312,27 @@ INCOMPATIBILITIES = {
     ("rotation_foot_RLeg", "rotation_foot_RLeg"),
     ("rotation_foot_LLeg", "rotation_foot_LLeg"),
 
-    # Crouch è lo stato terminale: nessuna transizione consentita dopo Crouch
+    # Crouch è lo stato terminale
     ("Crouch", "StandInit"),
     ("Crouch", "Stand"),
     ("Crouch", "move_forward"),
     ("Crouch", "right_arm")
 }
 
-
 # ==============================================================================
-# 5. FUNZIONI HELPER PER IL PLANNER
+# 5. FUNZIONI HELPER
 # ==============================================================================
 def get_duration(action_name):
     """Restituisce la durata in secondi di un'azione."""
     if action_name in ACTIONS:
         return ACTIONS[action_name]["duration"]
     raise KeyError("Azione sconosciuta: %s" % action_name)
+
+def get_energy(action_name):
+    """Restituisce il livello energetico (1-5) dell'azione."""
+    if action_name in ACTIONS:
+        return ACTIONS[action_name].get("energy", 3)
+    return 3
 
 def get_posture(action_name):
     """Restituisce la postura risultante ('post') dopo l'azione."""
@@ -312,37 +341,18 @@ def get_posture(action_name):
     raise KeyError("Azione sconosciuta: %s" % action_name)
 
 def is_transition_valid(prev_action, next_action):
-    """
-    Verifica se la transizione da prev_action a next_action è valida:
-    1. Verifica l'esistenza di entrambe le azioni.
-    2. Controlla che la postura post di prev_action soddisfi la pre di next_action.
-    3. Controlla che la coppia non sia presente in EXPLICIT_INCOMPATIBILITIES.
-    """
+    """Verifica se la transizione rispetta postura e stabilità."""
     if prev_action not in ACTIONS or next_action not in ACTIONS:
         return False
 
     prev_data = ACTIONS[prev_action]
     next_data = ACTIONS[next_action]
 
-    # Controllo incompatibilità esplicite
-    if (prev_action, next_action) in INCOMPATIBILITIES:
+    if (prev_action, next_action) in EXPLICIT_INCOMPATIBILITIES:
         return False
 
-    # Controllo precondizione di postura
     required_pre = next_data["pre"]
     if required_pre is not None and prev_data["post"] != required_pre:
         return False
 
     return True
-
-def get_valid_next_actions(current_action, candidate_list=None):
-    """
-    Restituisce tutte le azioni applicabili a partire da current_action.
-    Se candidate_list è fornita, filtra solo all'interno di quella lista.
-    """
-    pool = candidate_list if candidate_list is not None else ACTIONS.keys()
-    valid_actions = []
-    for candidate in pool:
-        if is_transition_valid(current_action, candidate):
-            valid_actions.append(candidate)
-    return valid_actions

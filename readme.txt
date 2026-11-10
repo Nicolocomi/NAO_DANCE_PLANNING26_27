@@ -27,11 +27,12 @@ https://github.com/Nicolocomi/NAO_DANCE_PLANNING26_27.git
     e funzione di costo g(n) con bonus di novità per garantire >= 5 intermedie distinte.
 - main.py:
     Entry point principale per l'esecuzione della coreografia. Gestisce la connessione
-    a NAOqi / Choregraphe, la riproduzione della musica e la sincronizzazione al secondo.
+    a NAOqi / Choregraphe e la sincronizzazione al secondo. La musica va fatta partire
+    manualmente (es. dal telefono) quando richiesto dal programma.
 - RobotPositions/:
     Raccolta degli script Python individuali di movimento e delle animazioni .crg.
 - music.mp3:
-    Traccia audio di 2 minuti sincronizzata con la coreografia.
+    Traccia audio di 2 minuti: Daft Punk - 'One More Time' (123 BPM) sincronizzata al millisecondo.
 
 
 3. REQUISITI SOFTWARE E LIBRERIE:
@@ -59,17 +60,25 @@ https://github.com/Nicolocomi/NAO_DANCE_PLANNING26_27.git
        python main.py --dry-run
 
 
-5. DETTAGLI TECNICI SULL'APPROCCIO DI AI PLANNING:
+5. DETTAGLI TECNICI SULL'APPROCCIO DI AI PLANNING MUSIC-DRIVEN:
 --------------------------------------------------------------------------------
-- Formulazione: Sub-goal State-Space Search con A*.
-- Posizioni Obbligatorie (6): Sit, SitRelax, Stand, StandZero, Wipe Forehead, Hello.
-- Stato Iniziale: StandInit (t = 0.0s) | Stato Obiettivo: Crouch (t = 119.5s).
-- Euristica h(n): stima della discrepanza temporale rimanente rispetto al budget del segmento:
-      h(n) = | T_budget - (t_accumulato + durata(P_target)) |
-- Funzione di Costo g(n): penalizza la frammentazione del cammino e assegna un bonus
-  di novità (-4.0) a ogni mossa intermedia non ancora utilizzata.
+- Colonna Sonora Ufficiale: Daft Punk - 'One More Time' (123 BPM, 4/4).
+- Formulazione AI: Sub-goal State-Space Search con A* guidato da vincoli musicali.
+- Allineamento Metrico (123 BPM): ogni battuta dura ~1.95s; i cambi di sezione
+  avvengono su frasi musicali di 8 battute (~15.6s) o 16 battute (~31.2s):
+    1. Intro (Horns Hook): risveglio e saluto al pubblico (Hello).
+    2. Verse 1 ('Celebrate'): danza funk e posa scenica (StandZero).
+    3. Chorus 1 (First Party Drop): workout ed esplosione di festa (Sit).
+    4. Breakdown 1: la batteria si ferma, momento chill a terra (SitRelax).
+    5. Breakdown 2 (Riser): rullante in crescendo, alzata energica (Stand).
+    6. Mega Drop Climax ('ONE MORE TIME!'): assolo chitarra rock, posa bicipiti
+       Macho Man e asciugamento fronte (Wipe Forehead).
+    7. Outro (Fade Out): passi d'onore e solenne inchino finale in ginocchio (Crouch).
+- Funzione di Valutazione A* f(n) = g(n) + h(n):
+    * Penalità energetica: aderenza del movimento al mood della sezione musicale.
+    * Bonus di novità: incentiva l'uso di nuove mosse ed evita ripetizioni.
 - Risultati ottenuti:
-    * Durata totale: 119.5 secondi (target 120s pienamente soddisfatto).
-    * Posizioni intermedie distinte utilizzate: 9 (regola >= 5 superata).
+    * Durata totale: 119.5 secondi (target 120s perfettamente centrato).
+    * Posizioni intermedie distinte utilizzate: 8 (regola >= 5 ampiamente superata).
     * Zero cadute e rispetto completo delle incompatibilità cinematiche.
 

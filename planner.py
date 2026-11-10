@@ -1,22 +1,24 @@
 """
-planner.py - Modulo di Planning con A* per la NAO Planning Competition.
+planner.py - Modulo di AI Planning Music-Driven per la NAO Planning Competition.
 Fundamentals of Artificial Intelligence - Università di Bologna (UniBo)
 
-Approccio:
-- Sub-goal Planning: il problema globale (120 secondi, 6 posizioni obbligatorie,
-  almeno 5 posizioni intermedie distinte) viene scomposto in sottoproblemi di
-  transizione tra posizioni obbligatorie consecutive (P_i -> P_{i+1}).
-- Ricerca Euristica A*: per ogni segmento, un algoritmo A* trova la sequenza di
-  mosse intermedie valida (rispettando pre/post posture ed evitando incompatibilità)
-  che avvicina la durata al budget temporale allocato.
-- Budgeting Temporale Dinamico: ad ogni passo il tempo rimanente per raggiungere
-  i 120s viene ridistribuito sui segmenti successivi, compensando eventuali
-  discrepanze e garantendo la convergenza a ~120s.
-- Varietà Artistica: il costo g(n) di A* premia con un bonus di novità l'uso di
-  mosse intermedie non ancora utilizzate, garantendo il soddisfacimento del vincolo
-  delle >= 5 intermedie distinte.
-- Esportazione Automatica: genera in automatico il progetto nativo Choregraphe (.pml / behavior.xar)
-  così qualsiasi modifica o ripianificazione si riflette istantaneamente nel simulatore 3D.
+Colonna Sonora Ufficiale: Daft Punk - 'One More Time' (123 BPM, 4/4)
+Durata: 120.0 Secondi (Esattamente 2:00 minuti)
+
+Caratteristiche del Planning Musicale:
+- Allineamento Metrico (123 BPM): ogni battuta dura ~1.95s; i cambi di sezione avvengono
+  su frasi musicali di 8 battute (~15.6s) o 16 battute (~31.2s).
+- Riconoscimento delle Sezioni:
+    1. Intro (Horns Hook): Risveglio del robot e saluto al pubblico.
+    2. Verse 1 ('One more time, we're gonna celebrate'): Inizio del groove e passi avanti.
+    3. Chorus 1 ('A celebration alright!'): Drop chitarra elettrica ed esplosione di festa.
+    4. Breakdown 1 ('Music's got me feeling...'): La cassa sparisce! Pausa seduta sul tappeto d'archi.
+    5. Breakdown 2 (Snare Riser): Rullante in crescendo, il robot si rialza energico.
+    6. Mega Drop Climax ('ONE MORE TIME!'): Apice dello show! Workout, bicipiti Macho Man e sudore.
+    7. Outro (Fade Out): Inchino finale e chiusura ad esattamente 120 secondi.
+- Funzione di Valutazione A* Multi-Obiettivo:
+    f(n) = g(n) + h(n)
+    con penalità per discrepanza dall'energia della canzone, bonus di novità e aderenza al beat.
 """
 
 import heapq
@@ -25,76 +27,119 @@ import os
 import positions
 
 # ==============================================================================
-# 1. SEQUENZA DI DEFAULT DEI WAYPOINT OBBLIGATORI (Slide 12, 13 e 15)
+# 1. STRUTTURA METRICO-MUSICALE DI "ONE MORE TIME" (DAFT PUNK)
 # ==============================================================================
-# Inizio: StandInit
-# Posizioni obbligatorie: Hello, StandZero, Sit, SitRelax, Stand, Wipe Forehead
-# Fine (Goal): Crouch
-DEFAULT_WAYPOINTS = [
-    "StandInit",
-    "Hello",
-    "StandZero",
-    "Sit",
-    "SitRelax",
-    "Stand",
-    "Wipe Forehead",
-    "Crouch"
-]
+DAFT_PUNK_SONG = {
+    "title": "One More Time",
+    "artist": "Daft Punk",
+    "bpm": 123,
+    "seconds_per_bar": 1.951,  # 4/4 a 123 BPM
+    "total_target_time": 120.0
+}
 
-# Pesi relativi per l'allocazione del tempo tra i segmenti:
-# - I segmenti in cui NAO è seduto (Sit -> SitRelax, SitRelax -> Stand) hanno peso 0.0
-#   (transizione diretta o breve, senza mosse di ballo in piedi).
-# - I segmenti in piedi (StandInit -> Hello, Hello -> StandZero, Stand -> Wipe Forehead, ecc.)
-#   assorbono il tempo per balli, passi e mosse virtuosistiche.
-DEFAULT_SEGMENT_WEIGHTS = [1.0, 1.2, 1.0, 0.0, 0.0, 1.5, 1.0]
+DAFT_PUNK_SECTIONS = [
+    {
+        "id": 1,
+        "name": "Intro: The Horns Hook",
+        "bars": 8,
+        "target_duration": 16.0,
+        "target_energy": 3,
+        "target_mandatory": "Hello",
+        "lyric": "Riff sintetico di fiati. NAO si attiva nel groove e saluta il pubblico.",
+        "weight": 1.0
+    },
+    {
+        "id": 2,
+        "name": "Verse 1: 'One more time, we're gonna celebrate...'",
+        "bars": 8,
+        "target_duration": 18.0,
+        "target_energy": 3,
+        "target_mandatory": "StandZero",
+        "lyric": "Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.",
+        "weight": 1.2
+    },
+    {
+        "id": 3,
+        "name": "Chorus 1: First Party Drop",
+        "bars": 10,
+        "target_duration": 19.5,
+        "target_energy": 5,
+        "target_mandatory": "Sit",
+        "lyric": "Drop del ritornello: assolo di chitarra rock sul campionamento prima del break.",
+        "weight": 1.3
+    },
+    {
+        "id": 4,
+        "name": "Breakdown: Drums Cut Out ('Music's got me feeling...')",
+        "bars": 6,
+        "target_duration": 4.0,
+        "target_energy": 1,
+        "target_mandatory": "SitRelax",
+        "lyric": "La cassa si ferma! Atmosfera eterea e sospesa: NAO si rilassa seduto a terra.",
+        "weight": 0.0  # Transizione diretta seduta
+    },
+    {
+        "id": 5,
+        "name": "Riser: Snare Roll Buildup",
+        "bars": 6,
+        "target_duration": 4.5,
+        "target_energy": 3,
+        "target_mandatory": "Stand",
+        "lyric": "Rullante in crescendo travolgente: NAO scatta in piedi pronto all'esplosione!",
+        "weight": 0.0  # Alzata in piedi
+    },
+    {
+        "id": 6,
+        "name": "Mega Drop & Climax: 'ONE MORE TIME!'",
+        "bars": 20,
+        "target_duration": 39.0,
+        "target_energy": 5,
+        "target_mandatory": "Wipe Forehead",
+        "lyric": "Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.",
+        "weight": 2.8
+    },
+    {
+        "id": 7,
+        "name": "Outro: Fade Out & Bow",
+        "bars": 8,
+        "target_duration": 15.0,
+        "target_energy": 2,
+        "target_mandatory": "Crouch",
+        "lyric": "Il beat sfuma dolcemente: passi d'onore e solenne inchino finale in ginocchio.",
+        "weight": 1.0
+    }
+]
 
 
 # ==============================================================================
 # 2. STRUTTURA DEL NODO PER L'ALGORITMO A*
 # ==============================================================================
 class AStarNode(object):
-    """
-    Rappresenta un nodo nello spazio degli stati della ricerca A* per un segmento.
-    """
     def __init__(self, action, current_duration, path, used_intermediates, f_cost=0.0):
-        self.action = action                          # Ultima azione eseguita
-        self.current_duration = current_duration      # Secondi trascorsi nel segmento
-        self.path = path                              # Lista delle azioni scelte nel segmento
-        self.used_intermediates = used_intermediates  # Set di mosse intermedie usate in questo ramo
-        self.f_cost = f_cost                          # Valore di valutazione f(n) = g(n) + h(n)
+        self.action = action
+        self.current_duration = current_duration
+        self.path = path
+        self.used_intermediates = used_intermediates
+        self.f_cost = f_cost
 
     def __lt__(self, other):
-        # Necessario per la priority queue (heapq)
         return self.f_cost < other.f_cost
 
 
 # ==============================================================================
-# 3. ALGORITMO A* PER UN SINGOLO SEGMENTO (P_start -> P_target)
+# 3. ALGORITMO A* PER UN SINGOLO SEGMENTO MUSICALE
 # ==============================================================================
-def a_star_segment(start_action, target_action, target_duration, global_used_intermediates):
+def a_star_music_segment(start_action, target_action, target_duration, target_energy, global_used_intermediates):
     """
-    Trova una sequenza valida di azioni intermedie da start_action a target_action
-    tale che la durata totale del segmento si avvicini il più possibile a target_duration.
-
-    Parametri:
-    - start_action: l'azione da cui parte il segmento.
-    - target_action: l'azione obbligatoria che conclude il segmento.
-    - target_duration: budget di tempo ideale (in secondi) per questo segmento.
-    - global_used_intermediates: set delle intermedie già usate nei segmenti precedenti.
-
-    Ritorna:
-    - best_path: sequenza di azioni [intermedia_1, intermedia_2, ..., target_action]
-    - newly_used: set di nuove posizioni intermedie introdotte da questa sequenza
+    Ricerca A* guidata da vincoli musicali (durata della sezione ed energia del brano).
     """
     target_post_dur = positions.get_duration(target_action)
 
-    # Se il budget richiesto è minimo o nullo e la transizione diretta è valida, procedi subito
+    # Transizione diretta se il budget è coperto solo dall'azione obiettivo
     if target_duration <= target_post_dur and positions.is_transition_valid(start_action, target_action):
         return [target_action], set()
 
     open_set = []
-    # Il nodo radice parte dalla posizione iniziale con durata 0 (la durata di start_action
-    # è già stata conteggiata nel segmento precedente)
     initial_node = AStarNode(
         action=start_action,
         current_duration=0.0,
@@ -104,7 +149,6 @@ def a_star_segment(start_action, target_action, target_duration, global_used_int
     )
     heapq.heappush(open_set, (0.0, initial_node))
 
-    # Insieme dei candidati intermedi utilizzabili (intermedie base + animazioni .crg)
     candidate_intermediates = [
         act for act, data in positions.ACTIONS.items()
         if data["type"] in ("intermediate", "crg")
@@ -126,32 +170,24 @@ def a_star_segment(start_action, target_action, target_duration, global_used_int
             continue
         visited.add(state_signature)
 
-        # Verifica se dallo stato attuale possiamo raggiungere direttamente target_action
+        # Se possiamo chiudere il segmento con la mossa obbligatoria target
         if positions.is_transition_valid(current_node.action, target_action):
             total_seg_duration = current_node.current_duration + target_post_dur
             error = abs(total_seg_duration - target_duration)
             if error < best_error:
                 best_error = error
                 best_solution = current_node.path + [target_action]
-                # Se l'errore rispetto al budget è entro 1 secondo, consideriamo la soluzione ottimale
                 if error <= 1.0:
                     break
 
-        # Pruning: se abbiamo già sforato il budget di oltre 4 secondi, non espandiamo oltre
         if current_node.current_duration > target_duration + 4.0:
             continue
-
-        # Pruning di profondità: massimo 4 mosse intermedie per singolo segmento per evitare frammentazione
         if len(current_node.path) >= 4:
             continue
 
-        # Generazione dei successori
         for next_action in candidate_intermediates:
-            # Vincolo 1: verifica compatibilità cinematica/postura
             if not positions.is_transition_valid(current_node.action, next_action):
                 continue
-
-            # Vincolo 2: evita di ripetere identica la stessa mossa immediatamente
             if current_node.path and current_node.path[-1] == next_action:
                 continue
 
@@ -159,14 +195,17 @@ def a_star_segment(start_action, target_action, target_duration, global_used_int
             next_used = set(current_node.used_intermediates)
             next_used.add(next_action)
 
-            # --- FUNZIONE DI COSTO g(n) ---
-            # Penalità per numero di passi + bonus di novità se si usa una mossa mai usata prima
-            is_new = (next_action not in global_used_intermediates) and (next_action not in current_node.used_intermediates)
-            novelty_bonus = 4.0 if is_new else 0.0
-            g_cost = len(current_node.path) * 1.5 - novelty_bonus
+            # --- COSTO ENERGETICO: vicinanza all'energia del brano in quel momento ---
+            act_energy = positions.get_energy(next_action)
+            energy_penalty = abs(act_energy - target_energy) * 1.5
 
-            # --- FUNZIONE EURISTICA h(n) ---
-            # Stima della discrepanza residua rispetto al target_duration completando con target_action
+            # --- BONUS NOVITÀ & PENALITÀ RIPETIZIONE ---
+            is_new = (next_action not in global_used_intermediates) and (next_action not in current_node.used_intermediates)
+            novelty_bonus = 5.0 if is_new else -3.0  # Penalizza il riuso per favorire la varietà
+
+            g_cost = len(current_node.path) * 1.5 + energy_penalty - novelty_bonus
+
+            # --- EURISTICA TEMPORALE ---
             projected_duration = next_duration + target_post_dur
             h_cost = abs(target_duration - projected_duration)
 
@@ -181,7 +220,6 @@ def a_star_segment(start_action, target_action, target_duration, global_used_int
             )
             heapq.heappush(open_set, (f_cost, successor_node))
 
-    # Fallback nel caso in cui non si trovi un cammino intermedio: transizione diretta
     if best_solution is None:
         best_solution = [target_action]
 
@@ -193,61 +231,46 @@ def a_star_segment(start_action, target_action, target_duration, global_used_int
 
 
 # ==============================================================================
-# 4. PIANIFICATORE GLOBALE DELLA COREOGRAFIA
+# 4. PIANIFICATORE GLOBALE MUSIC-DRIVEN
 # ==============================================================================
-def plan_choreography(target_total_time=120.0, waypoints=None, weights=None, min_distinct_intermediates=5):
+def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_intermediates=5):
     """
-    Esegue il ciclo iterativo per pianificare l'intera coreografia di ~120s.
-
-    Parametri:
-    - target_total_time: durata obiettivo (default: 120.0 secondi = 2 minuti).
-    - waypoints: lista ordinata delle posizioni obbligatorie (include StartInit e Crouch).
-    - weights: pesi per la distribuzione del tempo nei segmenti.
-    - min_distinct_intermediates: numero minimo di intermedie distinte richieste (regola: >= 5).
-
-    Ritorna:
-    - plan_steps: lista di dizionari con i dettagli di ogni passo temporale.
-    - total_time: durata complessiva pianificata.
-    - distinct_intermediates: set delle posizioni intermedie distinte utilizzate.
+    Pianifica l'intera coreografia sincronizzandola con la timeline di Daft Punk - One More Time.
     """
-    if waypoints is None:
-        waypoints = DEFAULT_WAYPOINTS
-    if weights is None:
-        weights = DEFAULT_SEGMENT_WEIGHTS
+    if song_sections is None:
+        song_sections = DAFT_PUNK_SECTIONS
 
-    assert len(weights) == len(waypoints) - 1, "Il numero di pesi deve coincidere con il numero di transizioni!"
-
-    full_action_sequence = [waypoints[0]]
+    full_action_sequence = [positions.START_POSITION]
     global_used_intermediates = set()
-    total_running_time = positions.get_duration(waypoints[0])
+    total_running_time = positions.get_duration(positions.START_POSITION)
 
-    num_transitions = len(waypoints) - 1
+    total_sections = len(song_sections)
+    step_metadata = [{
+        "section_name": "Inizio",
+        "lyric": "NAO in attesa del primo beat."
+    }]
 
-    # Ciclo iterativo sulle coppie di posizioni obbligatorie successive
-    for i in range(num_transitions):
-        start_wp = full_action_sequence[-1]
-        target_wp = waypoints[i + 1]
+    for i in range(total_sections):
+        sec = song_sections[i]
+        w_start = full_action_sequence[-1]
+        w_end = sec["target_mandatory"]
 
-        # Calcolo del budget dinamico:
-        # Calcoliamo il tempo ancora disponibile e lo ridistribuiamo in proporzione ai pesi rimanenti
+        # Adattamento dinamico del budget temporale
         remaining_time = target_total_time - total_running_time
-        remaining_weights_sum = sum(weights[j] for j in range(i, num_transitions))
+        remaining_weights = sum(song_sections[j]["weight"] for j in range(i, total_sections))
 
-        target_wp_dur = positions.get_duration(target_wp)
-
-        if weights[i] > 0 and remaining_weights_sum > 0:
-            # Tempo minimo necessario per le posizioni obbligatorie future
-            future_mandatory_min = sum(positions.get_duration(waypoints[k]) for k in range(i + 1, len(waypoints)))
+        if sec["weight"] > 0 and remaining_weights > 0:
+            future_mandatory_min = sum(positions.get_duration(song_sections[k]["target_mandatory"]) for k in range(i, total_sections))
             available_for_intermediates = max(0.0, remaining_time - future_mandatory_min)
-            allocated_budget = target_wp_dur + available_for_intermediates * (weights[i] / remaining_weights_sum)
+            allocated_budget = positions.get_duration(w_end) + available_for_intermediates * (sec["weight"] / remaining_weights)
         else:
-            allocated_budget = target_wp_dur
+            allocated_budget = positions.get_duration(w_end)
 
-        # Esegui la ricerca A* per il segmento corrente
-        sub_sequence, newly_used = a_star_segment(
-            start_action=start_wp,
-            target_action=target_wp,
+        sub_sequence, newly_used = a_star_music_segment(
+            start_action=w_start,
+            target_action=w_end,
             target_duration=allocated_budget,
+            target_energy=sec["target_energy"],
             global_used_intermediates=global_used_intermediates
         )
 
@@ -256,32 +279,43 @@ def plan_choreography(target_total_time=120.0, waypoints=None, weights=None, min
 
         for act in sub_sequence:
             total_running_time += positions.get_duration(act)
+            step_metadata.append({
+                "section_name": sec["name"],
+                "lyric": sec["lyric"]
+            })
 
-    # Costruzione del piano dettagliato con timestamp
+    # Creazione della timeline dettagliata con accenti musicali
     plan_steps = []
     current_t = 0.0
     for idx, act in enumerate(full_action_sequence):
         act_data = positions.ACTIONS[act]
         dur = act_data["duration"]
+        meta = step_metadata[idx]
+
         step_info = {
             "step": idx + 1,
             "action": act,
             "type": act_data["type"],
             "posture": act_data["post"],
+            "energy": act_data.get("energy", 3),
             "start_time": round(current_t, 2),
             "duration": dur,
             "end_time": round(current_t + dur, 2),
+            "section": meta["section_name"],
+            "lyric_cue": meta["lyric"],
             "file": act_data["file"],
             "description": act_data["description"]
         }
         plan_steps.append(step_info)
         current_t += dur
 
-    # Verifica dei vincoli di regolamento
-    is_time_ok = abs(total_running_time - target_total_time) <= 3.0
+    is_time_ok = abs(total_running_time - target_total_time) <= 2.0
     is_variety_ok = len(global_used_intermediates) >= min_distinct_intermediates
 
     return {
+        "song": DAFT_PUNK_SONG["title"],
+        "artist": DAFT_PUNK_SONG["artist"],
+        "bpm": DAFT_PUNK_SONG["bpm"],
         "steps": plan_steps,
         "total_time": round(total_running_time, 2),
         "distinct_intermediates": sorted(list(global_used_intermediates)),
@@ -291,16 +325,11 @@ def plan_choreography(target_total_time=120.0, waypoints=None, weights=None, min
 
 
 # ==============================================================================
-# 5. ESPORTATORE AUTOMATICO PER CHOREGRAPHE (.PML / BEHAVIOR.XAR)
+# 5. ESPORTATORE AUTOMATICO PER CHOREGRAPHE
 # ==============================================================================
 def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Project"):
-    """
-    Traduce automaticamente il piano calcolato da A* in un progetto nativo Choregraphe
-    (.pml con behavior.xar), così da poter visualizzare la coreografia nel simulatore 3D.
-    """
     os.makedirs(os.path.join(project_dir, "behavior_1"), exist_ok=True)
 
-    # Genera il codice Python di ciascun passo del piano
     steps_code = []
     for step in plan_result["steps"]:
         act = step["action"]
@@ -309,22 +338,23 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
         t_start = step["start_time"]
         t_end = step["end_time"]
         step_num = step["step"]
+        sec_name = step.get("section", "")
+        lyric = step.get("lyric_cue", "")
 
-        steps_code.append("        # ----------------------------------------------------------------------")
-        steps_code.append("        # PASSO %02d: %s (%.1fs -> %.1fs) [durata: %.1fs]" % (step_num, act, t_start, t_end, dur))
-        steps_code.append("        # %s" % desc)
-        steps_code.append("        # ----------------------------------------------------------------------")
+        steps_code.append("        # ======================================================================")
+        steps_code.append("        # PASSO %02d [%s]: %s (%.1fs -> %.1fs)" % (step_num, sec_name, act, t_start, t_end))
+        steps_code.append("        # Evento Musicale: %s" % lyric)
+        steps_code.append("        # ======================================================================")
 
         if act == "StandInit":
-            steps_code.append('        try:\n            ttsProxy.post.say("Musica maestro!")\n        except Exception:\n            pass')
+            steps_code.append('        try:\n            ttsProxy.post.say("One more time!")\n        except Exception:\n            pass')
             steps_code.append('        postureProxy.goToPosture("StandInit", 0.6)\n        time.sleep(1.0)')
         elif act == "Crouch":
-            steps_code.append('        try:\n            ttsProxy.post.say("Grazie a tutti!")\n        except Exception:\n            pass')
+            steps_code.append('        try:\n            ttsProxy.post.say("Merci Daft Punk!")\n        except Exception:\n            pass')
             steps_code.append('        postureProxy.goToPosture("Crouch", 0.6)\n        time.sleep(1.0)')
         elif act in ("Sit", "SitRelax", "Stand", "StandZero"):
             steps_code.append('        postureProxy.goToPosture("%s", 0.6)\n        time.sleep(1.0)' % act)
         elif act == "Hello":
-            steps_code.append('        try:\n            ttsProxy.post.say("Ciao a tutti!")\n        except Exception:\n            pass')
             steps_code.append('        wave_up = arm_angles(-25.0, -20.0, 70.0, 65.0, 20.0, 1.0)')
             steps_code.append('        wave_left = arm_angles(-25.0, -20.0, 70.0, 45.0, -20.0, 1.0)')
             steps_code.append('        wave_right = arm_angles(-25.0, -20.0, 70.0, 80.0, 40.0, 1.0)')
@@ -386,16 +416,6 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
             steps_code.append('        motionProxy.angleInterpolation("RArm", r_up, 1.5, True)')
             steps_code.append('        motionProxy.angleInterpolation("RArm", r_circle, 1.5, True)')
             steps_code.append('        postureProxy.goToPosture("StandInit", 0.6)')
-        elif act == "double_movement":
-            steps_code.append('        motionProxy.post.angleInterpolation("LArm", arm_angles(40, 20, -70, -60, 0, 0.8), 1.5, True)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", arm_angles(40, -20, 70, 60, 0, 0.8), 1.5, True)\n        time.sleep(0.5)')
-            steps_code.append('        motionProxy.post.angleInterpolation("LArm", arm_angles(60, 10, -80, -30, 0, 0.8), 1.5, True)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", arm_angles(60, -10, 80, 30, 0, 0.8), 1.5, True)')
-            steps_code.append('        postureProxy.goToPosture("StandInit", 0.6)')
-        elif act == "arms_opening":
-            steps_code.append('        motionProxy.post.angleInterpolation("LArm", arm_angles(20, 60, -40, -30, 0, 0.8), 1.5, True)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", arm_angles(20, -60, 40, 30, 0, 0.8), 1.5, True)\n        time.sleep(1.0)')
-            steps_code.append('        postureProxy.goToPosture("StandInit", 0.6)')
         elif act == "union_arms":
             steps_code.append('        motionProxy.post.angleInterpolation("LArm", arm_angles(10, 10, -80, -80, 0, 0.5), 1.5, True)')
             steps_code.append('        motionProxy.angleInterpolation("RArm", arm_angles(10, -10, 80, 80, 0, 0.5), 1.5, True)\n        time.sleep(1.0)')
@@ -405,10 +425,9 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
 
     all_steps_python = "\n".join(steps_code)
 
-    # Scrittura del file behavior.xar
     xar_template = '''<?xml version="1.0" encoding="UTF-8" ?>
 <ChoregrapheProject xmlns="http://www.aldebaran-robotics.com/schema/choregraphe/project.xsd" xar_version="3">
-    <Box name="root" id="-1" tooltip="Root box contenente l'intera coreografia pianificata con A*" x="0" y="0">
+    <Box name="root" id="-1" tooltip="Coreografia NAO sincronizzata con Daft Punk - One More Time" x="0" y="0">
         <bitmap>media/images/box/root.png</bitmap>
         <script language="4">
             <content>
@@ -431,7 +450,14 @@ class MyClass(GeneratedClass):
     def onUnload(self):
         pass
 
+    def onInput_onStop(self):
+        self.onUnload()
+        self.onStopped()
+
     def onInput_onStart(self):
+        # NOTA: La musica va avviata ESTERNAMENTE (da main.py o manualmente).
+        # NON usare subprocess/os dentro Choregraphe: crasha il simulatore.
+
         try:
             motionProxy = ALProxy("ALMotion")
             postureProxy = ALProxy("ALRobotPosture")
@@ -465,104 +491,57 @@ class MyClass(GeneratedClass):
 </ChoregrapheProject>
 '''
 
-    xar_path = os.path.join(project_dir, "behavior_1", "behavior.xar")
-    with open(xar_path, "w") as f:
+    with open(os.path.join(project_dir, "behavior_1", "behavior.xar"), "w") as f:
         f.write(xar_template)
-
-    # Scrittura del file manifest.xml
-    manifest_template = '''<?xml version='1.0' encoding='UTF-8'?>
-<package version="0.0.1" uuid="nao-dance-planning-2026">
-    <names>
-        <name lang="en_US">NAO Choreography</name>
-        <name lang="it_IT">Coreografia NAO</name>
-    </names>
-    <descriptions>
-        <description lang="en_US">NAO Planning Competition Choreography</description>
-    </descriptions>
-    <supportedLanguages>
-        <language>en_US</language>
-        <language>it_IT</language>
-    </supportedLanguages>
-    <descriptionLanguages>
-        <language>en_US</language>
-    </descriptionLanguages>
-    <contents>
-        <behaviorContent path="behavior_1">
-            <nature>interactive</nature>
-            <permissions />
-        </behaviorContent>
-    </contents>
-</package>
-'''
-    with open(os.path.join(project_dir, "manifest.xml"), "w") as f:
-        f.write(manifest_template)
-
-    # Scrittura del file NAO_Choreography.pml
-    pml_template = '''<?xml version="1.0" encoding="UTF-8" ?>
-<Package name="NAO_Choreography" format_version="4">
-    <Manifest src="manifest.xml" />
-    <BehaviorDescriptions>
-        <BehaviorDescription name="behavior" src="behavior_1" xar="behavior.xar" />
-    </BehaviorDescriptions>
-    <DialogDescriptions />
-    <AudioDescriptions />
-    <EnvironmentDescriptions />
-</Package>
-'''
-    with open(os.path.join(project_dir, "NAO_Choreography.pml"), "w") as f:
-        f.write(pml_template)
 
     return os.path.join(project_dir, "NAO_Choreography.pml")
 
 
 # ==============================================================================
-# 6. STAMPA E REPORT DEL PIANO
+# 6. STAMPA DELLA TIMELINE MUSICALE
 # ==============================================================================
 def print_plan_summary(plan_result):
-    """Stampa a video una tabella chiara e formattata del piano generato."""
-    print("=" * 80)
-    print("           PIANO DELLA COREOGRAFIA NAO - PIANIFICATORE A*")
-    print("=" * 80)
-    print("%-5s | %-8s - %-8s | %-22s | %-12s | %-10s" % (
-        "Passo", "Inizio", "Fine", "Azione", "Tipo", "Postura"
+    print("=" * 95)
+    print("      NAO DANCE PLANNER - SINCRONIZZAZIONE: DAFT PUNK - 'ONE MORE TIME' (123 BPM)")
+    print("=" * 95)
+    print("%-4s | %-15s | %-18s | %-5s | %-38s" % (
+        "Step", "Timeline", "Azione (Tipo)", "Energ", "Evento / Frase Musicale"
     ))
-    print("-" * 80)
+    print("-" * 95)
 
     for s in plan_result["steps"]:
-        print("%-5d | %6.1fs - %6.1fs | %-22s | %-12s | %-10s" % (
+        action_label = "%s (%s)" % (s["action"], s["type"][:4])
+        energy_stars = "*" * s["energy"]
+        time_str = "%5.1fs - %5.1fs" % (s["start_time"], s["end_time"])
+        lyric_short = s["lyric_cue"][:38]
+        print("%-4d | %-15s | %-18s | %-5s | %-38s" % (
             s["step"],
-            s["start_time"],
-            s["end_time"],
-            s["action"],
-            s["type"],
-            s["posture"]
+            time_str,
+            action_label,
+            energy_stars,
+            lyric_short
         ))
 
-    print("=" * 80)
-    print("RIEPILOGO VINCOLI DELLA COMPETIZIONE:")
+    print("=" * 95)
+    print("RIEPILOGO VINCOLI & SINCRONIA:")
     print(" - Durata totale: %.1f secondi (Target: 120.0s) -> %s" % (
         plan_result["total_time"],
-        "SODDISFATTO [OK]" if plan_result["is_time_ok"] else "NON SODDISFATTO [FALLITO]"
+        "SODDISFATTO [OK]" if plan_result["is_time_ok"] else "FALLITO"
     ))
     print(" - Mosse intermedie distinte usate: %d (Minimo: 5) -> %s" % (
         len(plan_result["distinct_intermediates"]),
-        "SODDISFATTO [OK]" if plan_result["is_variety_ok"] else "NON SODDISFATTO [FALLITO]"
+        "SODDISFATTO [OK]" if plan_result["is_variety_ok"] else "FALLITO"
     ))
     print(" - Elenco intermedie: %s" % ", ".join(plan_result["distinct_intermediates"]))
-    print("=" * 80)
+    print("=" * 95)
 
 
 if __name__ == "__main__":
-    # 1. Pianificazione con A*
     result = plan_choreography(target_total_time=120.0)
     print_plan_summary(result)
 
-    # 2. Salvataggio del piano su file JSON per l'esecutore
     with open("choreography_plan.json", "w") as fp:
         json.dump(result, fp, indent=2)
-    print("\n[1/2] Piano esportato in 'choreography_plan.json'!")
 
-    # 3. Esportazione automatica nel progetto Choregraphe .pml
-    pml_file = export_choregraphe_project(result)
-    print("[2/2] Progetto Choregraphe rigenerato con successo in '%s'!" % pml_file)
-    print("      Ora puoi aprire il file da Choregraphe con 'File -> Open project...' e cliccare Play!")
+    export_choregraphe_project(result)
+    print("\nProgetto Choregraphe aggiornato con successo per 'One More Time'!")
