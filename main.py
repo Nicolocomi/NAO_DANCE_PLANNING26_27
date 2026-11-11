@@ -164,26 +164,6 @@ def _execute_builtin_action(step_info, deadline, motion_proxy, posture_proxy):
     action_name = step_info["action"]
     duration = step_info["duration"]
 
-    if action_name in ("step_left", "step_right"):
-        if motion_proxy is None:
-            print("  [ERRORE] Proxy ALMotion non disponibile per '%s'." % action_name)
-            return False
-        lateral_distance = (
-            planner.positions.ACTIONS[action_name]["side_step_meters"]
-            * planner.positions.ACTIONS[action_name]["footwork_direction"]
-        )
-        try:
-            task_id = motion_proxy.post.moveTo(0.0, lateral_distance, 0.0)
-            if not _wait_for_task(
-                    motion_proxy, task_id, deadline,
-                    lambda: motion_proxy.stop(task_id)):
-                return False
-        except Exception as error:
-            print("  [ERRORE] Passo laterale '%s' fallito: %s" % (action_name, error))
-            return False
-        _sleep_until(deadline)
-        return True
-
     phrase_name = None
     if planner.positions.ACTIONS[action_name].get("dance_phrase"):
         phrase_name = action_name

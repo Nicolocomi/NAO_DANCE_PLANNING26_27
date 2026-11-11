@@ -2,7 +2,6 @@
 
 import math
 import sys
-import time
 
 try:
     from naoqi import ALProxy
@@ -24,7 +23,6 @@ def _arm_angles(shoulder_pitch, shoulder_roll, elbow_yaw, elbow_roll, wrist_yaw=
 def main(robot_ip, port):
     if ALProxy is None:
         print("[MOCK] Esecuzione Hello su %s:%s (naoqi non installato)" % (robot_ip, port))
-        time.sleep(4.5)
         return
 
     try:
@@ -32,12 +30,6 @@ def main(robot_ip, port):
     except Exception as e:
         print("Errore creazione ALMotion: %s" % e)
         return
-
-    try:
-        ttsProxy = ALProxy("ALTextToSpeech", robot_ip, port)
-        ttsProxy.say("Ciao a tutti!")
-    except Exception:
-        pass
 
     # Solleva il braccio destro per salutare
     names = "RArm"
@@ -61,4 +53,3 @@ if __name__ == "__main__":
     robot_ip = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 9559
     main(robot_ip, port)
-

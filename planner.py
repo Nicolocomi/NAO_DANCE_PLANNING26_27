@@ -14,7 +14,7 @@ Caratteristiche del Planning Musicale:
     3. Chorus 1 ('A celebration alright!'): Drop chitarra elettrica ed esplosione di festa.
     4. Breakdown 1 ('Music's got me feeling...'): La cassa sparisce! Pausa seduta sul tappeto d'archi.
     5. Breakdown 2 (Snare Riser): Rullante in crescendo, il robot si rialza energico.
-    6. Mega Drop Climax ('ONE MORE TIME!'): Apice dello show! Workout, bicipiti Macho Man e sudore.
+    6. Mega Drop Climax ('ONE MORE TIME!'): Apice dello show! Workout e sudore.
     7. Outro (Fade Out): Inchino finale e chiusura ad esattamente 120 secondi.
 - Ricerca A* multi-obiettivo, che bilancia durata, energia, varietà e ripetizioni.
 """
@@ -58,8 +58,6 @@ DAFT_PUNK_SECTIONS = [
         "target_mandatory": "StandZero",
         "lyric": "Entra la voce robotica e il basso funky. Danza a tutto corpo e posa scenica.",
         "cue_action": "arm_to_sky",
-        "required_actions": ["clap"],
-        "required_action_windows": {"clap": [8.0, 14.0]},
         "weight": 1.2
     },
     {
@@ -99,7 +97,7 @@ DAFT_PUNK_SECTIONS = [
         "target_duration": 39.0,
         "target_energy": 5,
         "target_mandatory": "Wipe Forehead",
-        "lyric": "Cassa a palla! Workout sfrenato, footwork, posa bicipiti Macho Man e asciugamento fronte.",
+        "lyric": "Cassa a palla! Workout sfrenato e asciugamento fronte.",
         "cue_action": "arm_to_sky",
         "required_actions": ["seated_arm_to_sky"],
         "required_action_windows": {"seated_arm_to_sky": [6.8, 7.1]},
@@ -123,16 +121,14 @@ DAFT_PUNK_SECTIONS = [
 # ==============================================================================
 def a_star_music_segment(start_action, target_action, target_duration, target_energy,
                          global_used_intermediates, required_first_action=None,
-                         min_footwork=0, required_actions=(),
-                         required_action_windows=None):
+                         required_actions=(), required_action_windows=None):
     """
     Cerca la sequenza a costo minimo con A*, usando la durata residua come
     euristica ottimistica e rispettando transizioni, ritmo e passi richiesti.
     """
     target_post_dur = positions.get_duration(target_action)
 
-    if (required_first_action is None and min_footwork == 0
-            and not required_actions
+    if (required_first_action is None and not required_actions
             and target_duration <= target_post_dur
             and positions.is_transition_valid(start_action, target_action)):
         return [target_action], set()
@@ -140,9 +136,6 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
     if (required_first_action is not None
             and not positions.is_transition_valid(start_action, required_first_action)):
         raise ValueError("Transizione non valida verso l'azione richiesta: %s" % required_first_action)
-
-    if min_footwork % 2:
-        raise ValueError("Il numero minimo di passi deve essere pari per mantenere il bilanciamento.")
 
     required_actions = tuple(required_actions)
     required_action_windows = required_action_windows or {}
@@ -155,7 +148,7 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
             raise ValueError("Azione obbligatoria sconosciuta: %s" % action)
     candidates = [
         action for action, data in positions.ACTIONS.items()
-        if (data.get("dance_phrase") or data.get("footwork_direction"))
+        if data.get("dance_phrase")
         and (not data.get("cue_only") or action in required_action_bits)
     ]
     if any(action not in candidates for action in required_actions):
@@ -168,12 +161,6 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
     initial_action = required_first_action or start_action
     action_bits = {action: 1 << index for index, action in enumerate(candidates)}
     used_mask = action_bits.get(required_first_action, 0)
-    initial_footwork = int(bool(required_first_action and
-                                positions.ACTIONS[required_first_action].get("footwork_direction")))
-    initial_balance = (
-        positions.ACTIONS[required_first_action].get("footwork_direction", 0)
-        if required_first_action else 0
-    )
     initial_required_mask = required_action_bits.get(required_first_action, 0)
     initial_cost = 0.0
     if required_first_action:
@@ -215,8 +202,6 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
         None,
         initial_duration_ms,
         used_mask,
-        min(initial_footwork, min_footwork),
-        initial_balance,
         initial_required_mask,
     )
     serial = itertools.count()
@@ -235,10 +220,8 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
         if path_cost != best_cost_by_state.get(state):
             continue
 
-        (last_action, previous_action, elapsed_ms, mask, footwork_count,
-         footwork_balance, required_mask) = state
-        if (footwork_count >= min_footwork and footwork_balance == 0
-                and required_mask == complete_required_mask
+        (last_action, previous_action, elapsed_ms, mask, required_mask) = state
+        if (required_mask == complete_required_mask
                 and positions.is_transition_valid(last_action, target_action)):
             timing_error = abs(target_ms - elapsed_ms - target_post_ms) / 1000.0
             score = path_cost + timing_error * 8.0
@@ -250,14 +233,9 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
             continue
 
         for next_action in candidates:
-            next_data = positions.ACTIONS[next_action]
-            next_is_footwork = bool(next_data.get("footwork_direction"))
             if not positions.is_transition_valid(last_action, next_action):
                 continue
-            if next_is_footwork:
-                if last_action == next_action:
-                    continue
-            elif next_action in (last_action, previous_action):
+            if next_action in (last_action, previous_action):
                 continue
 
             next_elapsed_ms = elapsed_ms + round(
@@ -287,17 +265,9 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
                 edge_cost += 0.2
             next_cost = path_cost + edge_cost
 
-            next_footwork_count = min(
-                min_footwork,
-                footwork_count + int(next_is_footwork)
-            )
-            next_balance = footwork_balance
-            if next_is_footwork:
-                next_balance += next_data["footwork_direction"]
             next_required_mask = required_mask | required_bit
             next_state = (
-                next_action, last_action, next_elapsed_ms, next_mask,
-                next_footwork_count, next_balance, next_required_mask
+                next_action, last_action, next_elapsed_ms, next_mask, next_required_mask
             )
             if next_cost >= best_cost_by_state.get(next_state, float("inf")):
                 continue
@@ -355,7 +325,6 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         else:
             allocated_budget = positions.get_duration(w_end)
 
-        required_footwork = 4 if sec["id"] in (1, 2, 3) else 0
         sub_sequence, newly_used = a_star_music_segment(
             start_action=w_start,
             target_action=w_end,
@@ -363,7 +332,6 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
             target_energy=sec["target_energy"],
             global_used_intermediates=global_used_intermediates,
             required_first_action=sec.get("cue_action"),
-            min_footwork=required_footwork,
             required_actions=sec.get("required_actions", ()),
             required_action_windows=sec.get("required_action_windows")
         )
@@ -390,7 +358,6 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         for section in song_sections
         if section.get("cue_action")
     }
-    protected_actions.update(("step_left", "step_right"))
     time_before_goal = sum(
         positions.get_duration(action) for action in full_action_sequence[:-1]
     )
@@ -541,15 +508,6 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
                 '        run_posture_action("%s", 0.65, choreography_start + %.2f)'
                 % (act, t_end)
             )
-        elif positions.ACTIONS[act].get("footwork_direction"):
-            lateral_distance = (
-                positions.ACTIONS[act]["side_step_meters"]
-                * positions.ACTIONS[act]["footwork_direction"]
-            )
-            steps_code.append(
-                '        run_footwork(0.0, %.3f, choreography_start + %.2f)'
-                % (lateral_distance, t_end)
-            )
         elif positions.ACTIONS[act].get("dance_phrase"):
             steps_code.append(
                 '        play_dance_phrase("%s", %.3f, choreography_start + %.2f)'
@@ -565,11 +523,6 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
                 '        play_dance_phrase("wipe_forehead", %.3f, choreography_start + %.2f)'
                 % (dur, t_end)
             )
-        elif act == "macho_man":
-            steps_code.append('        biceps_left = arm_angles(25.0, 10.0, -75.0, -80.0, 0.0, 0.8)')
-            steps_code.append('        biceps_right = arm_angles(25.0, -10.0, 75.0, 80.0, 0.0, 0.8)')
-            steps_code.append('        motionProxy.post.angleInterpolation("LArm", biceps_left, 1.5, True)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", biceps_right, 1.5, True)')
         elif act == "move_forward":
             steps_code.append('        try:\n            motionProxy.moveTo(0.12, 0.0, 0.0)\n        except Exception:\n            time.sleep(4.0)')
         elif act == "move_backward":
@@ -622,7 +575,7 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
     guarded_steps = []
     actuator_prefixes = (
         "motionProxy.", "postureProxy.", "play_dance_phrase(",
-        "run_posture_action(", "run_footwork(", "time.sleep("
+        "run_posture_action(", "time.sleep("
     )
     for line in raw_steps_python.splitlines():
         stripped_line = line.lstrip()
@@ -799,23 +752,6 @@ class MyClass(GeneratedClass):
                 return completed
             except Exception as error:
                 print("Errore nella transizione a %s: %s" % (name, error))
-                return False
-
-        def run_footwork(x, y, deadline):
-            if choreography_stop.is_set() or time.time() >= deadline:
-                print("Deadline raggiunta prima del passo laterale.")
-                return False
-            try:
-                task_id = motionProxy.post.moveTo(x, y, 0.0)
-                completed = wait_for_task(
-                    motionProxy, task_id, deadline,
-                    lambda: motionProxy.stop(task_id)
-                )
-                if not completed:
-                    print("Passo laterale interrotto alla deadline.")
-                return completed
-            except Exception as error:
-                print("Errore nel passo laterale: %s" % error)
                 return False
 
         def play_dance_phrase(name, duration, deadline):

@@ -18,8 +18,19 @@ Movimenti:
   4 Arms_opening; 5 Union_arms; 6 Crouch; 7 Move_forward;
   8 Move_backward; 9 Diagonal_left; 10 Diagonal_right; 11 Stand;
   12 Rotation_foot_RLeg; 13 Rotation_foot_LLeg; 14 StandInit;
-  15 StandZero; 16 Sit; 17 SitRelax; 18 Macho_man; 19 Hello;
-  20 Wipe_forehead; 21 Arm_to_sky.
+  15 StandZero; 16 Sit; 17 SitRelax; 19 Hello;
+  20 Wipe_forehead; 21 Arm_to_sky; 23 Seated_arm_to_sky;
+  24 Disco_groove; 25 Side_step_groove; 26 Robot_pulse;
+  27 Arm_wave_combo; 28 Party_punches; 29 Climax_reach.
+- Gli script 23-29 sono eseguibili singolarmente e condividono
+  RobotPositions/action_runner.py per le chiamate NAOqi e le pose definite
+  in positions.py.
+- RobotPositions/choregraphe_test_box.py contiene un box Python di prova:
+  copiarne il contenuto in un box Python di Choregraphe e cambiare ACTION
+  per provare una singola azione (tutte le 27 azioni .py e le 4 animazioni
+  .crg); il tempo viene stampato nel Log Viewer. Le .crg devono essere
+  installate nel robot virtuale. arm_dance è un box Choregraphe, non un file
+  locale, e non è incluso nel box di prova.
 - Il planner inserisce Arm_to_sky all'inizio della prima strofa, sul primo
   "One more time", e poi prosegue con le altre mosse.
 - Le mosse intermedie sono frasi di braccia e testa su otto battiti, eseguite
@@ -73,7 +84,6 @@ COME USARLO
    - Dopo `StandInit`, `disco_groove` parte senza una pausa iniziale aggiunta.
      Nei primi tre segmenti A* inserisce almeno quattro passi laterali per
      segmento (due coppie bilanciate); i passi opposti si compensano. Nel
-     Verse è incluso anche il clap.
    - Il piano è generato dinamicamente con A* dai vincoli musicali, dalle
      pose obbligatorie e dalle transizioni ammesse; choreography_plan.json
      è solo un output rigenerabile.

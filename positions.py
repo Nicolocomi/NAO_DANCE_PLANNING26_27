@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 positions.py - Modellazione dello Spazio degli Stati, Azioni e Vincoli per NAO.
 Fundamentals of Artificial Intelligence - NAO Planning Competition (UniBo)
@@ -47,7 +48,6 @@ INTERMEDIATE_POSITIONS = [
     "diagonal_right",        # 1 passo diagonale a destra
     "rotation_foot_Lleg",    # Movimento con la gamba/piede sinistro
     "rotation_foot_Rleg",    # Movimento con la gamba/piede destro
-    "macho_man"              # Posa double-biceps con entrambe le braccia
 ]
 
 # Animazioni avanzate da file .crg (importabili in Choregraphe)
@@ -192,13 +192,6 @@ DANCE_PHRASES = {
         _SKY_REACH, _SKY_REACH, _OPEN, _OPEN,
         _SKY_REACH, _OPEN, _OPEN, _NEUTRAL
     ],
-    "clap": [
-        _dance_pose(
-            [45, 14, -30, -52, 0, hand],
-            [45, -14, 30, 52, 0, hand]
-        )
-        for hand in (0.2, 0.0, 0.2, 0.0, 0.2, 0.0, 0.2, 0.0)
-    ],
     "seated_arm_to_sky": [
         _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
         _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
@@ -230,7 +223,7 @@ ACTIONS = {
         "description": "Posizione eretta iniziale con braccia avanzate (risveglio)"
     },
     "Crouch": {
-        "duration": 8.0,
+        "duration": 4.0,
         "energy": 1,
         "pre": STANDING,
         "post": CROUCHING,
@@ -297,7 +290,7 @@ ACTIONS = {
 
     # --- POSIZIONI INTERMEDIE (INTERMEDIATE) ---
     "rotation_handgun": {
-        "duration": 8.0,
+        "duration": 5.0,
         "energy": 3,
         "pre": STANDING,
         "post": STANDING,
@@ -306,7 +299,7 @@ ACTIONS = {
         "description": "Movimento ritmico con il braccio e l'oggetto"
     },
     "right_arm": {
-        "duration": 10.0,
+        "duration": 6.0,
         "energy": 4,
         "pre": STANDING,
         "post": STANDING,
@@ -323,42 +316,13 @@ ACTIONS = {
         "file": "RobotPositions/21-Arm_to_sky.py",
         "description": "Alza il braccio destro verso il cielo sul primo 'One more time'"
     },
-    "step_left": {
-        "duration": 1.951,
-        "energy": 3,
-        "pre": STANDING,
-        "post": STANDING,
-        "type": "intermediate",
-        "footwork_direction": 1,
-        "side_step_meters": 0.03,
-        "description": "Piccolo passo laterale controllato verso sinistra"
-    },
-    "step_right": {
-        "duration": 1.951,
-        "energy": 3,
-        "pre": STANDING,
-        "post": STANDING,
-        "type": "intermediate",
-        "footwork_direction": -1,
-        "side_step_meters": 0.03,
-        "description": "Piccolo passo laterale controllato verso destra"
-    },
-    "clap": {
-        "duration": 3.902,
-        "energy": 4,
-        "pre": STANDING,
-        "post": STANDING,
-        "type": "intermediate",
-        "dance_phrase": True,
-        "cue_only": True,
-        "description": "Clap ritmico con mani che si avvicinano senza urto"
-    },
     "seated_arm_to_sky": {
         "duration": 3.902,
         "energy": 5,
         "pre": None,
         "post": STANDING,
         "type": "intermediate",
+        "file": "RobotPositions/23-Seated_arm_to_sky.py",
         "dance_phrase": True,
         "cue_only": True,
         "description": "Richiamo del ritornello con braccio destro alto, eseguibile anche da seduto"
@@ -369,6 +333,7 @@ ACTIONS = {
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
+        "file": "RobotPositions/24-Disco_groove.py",
         "dance_phrase": True,
         "description": "Groove disco a braccia alternate, in otto battiti"
     },
@@ -378,6 +343,7 @@ ACTIONS = {
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
+        "file": "RobotPositions/25-Side_step_groove.py",
         "dance_phrase": True,
         "description": "Oscillazione laterale di braccia e testa sincronizzata sul beat"
     },
@@ -387,6 +353,7 @@ ACTIONS = {
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
+        "file": "RobotPositions/26-Robot_pulse.py",
         "dance_phrase": True,
         "description": "Pulsazione robotica delle braccia a tempo"
     },
@@ -396,6 +363,7 @@ ACTIONS = {
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
+        "file": "RobotPositions/27-Arm_wave_combo.py",
         "dance_phrase": True,
         "description": "Aperture e onde delle braccia con accenti della testa"
     },
@@ -405,6 +373,7 @@ ACTIONS = {
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
+        "file": "RobotPositions/28-Party_punches.py",
         "dance_phrase": True,
         "description": "Pugni disco alternati sul tempo forte"
     },
@@ -414,11 +383,12 @@ ACTIONS = {
         "pre": STANDING,
         "post": STANDING,
         "type": "intermediate",
+        "file": "RobotPositions/29-Climax_reach.py",
         "dance_phrase": True,
         "description": "Combinazione energica di slanci e accenti del ritornello"
     },
     "double_movement": {
-        "duration": 8.0,
+        "duration": 5.0,
         "energy": 4,
         "pre": STANDING,
         "post": STANDING,
@@ -427,7 +397,7 @@ ACTIONS = {
         "description": "Movimento sincrono ed energico con entrambe le braccia"
     },
     "arms_opening": {
-        "duration": 10.0,
+        "duration": 7.0,
         "energy": 3,
         "pre": STANDING,
         "post": STANDING,
@@ -436,7 +406,7 @@ ACTIONS = {
         "description": "Apertura solenne e rotazione simultanea delle braccia"
     },
     "union_arms": {
-        "duration": 9.0,
+        "duration": 7.0,
         "energy": 3,
         "pre": STANDING,
         "post": STANDING,
@@ -490,7 +460,7 @@ ACTIONS = {
         "description": "Footwork ritmico e bilanciamento sulla gamba sinistra"
     },
     "rotation_foot_Rleg": {
-        "duration": 11.0,
+        "duration": 5.0,
         "energy": 4,
         "pre": STANDING,
         "post": STANDING,
@@ -498,16 +468,6 @@ ACTIONS = {
         "file": "RobotPositions/12-Rotation_foot_RLeg.py",
         "description": "Footwork ritmico e bilanciamento sulla gamba destra"
     },
-    "macho_man": {
-        "duration": 4.0,
-        "energy": 5,
-        "pre": STANDING,
-        "post": STANDING,
-        "type": "intermediate",
-        "file": "RobotPositions/18-Macho_man.py",
-        "description": "Posa double-biceps: flette i muscoli con fierezza al culmine del drop!"
-    },
-
     # --- ANIMAZIONI DA FILE .CRG ---
     "sing_with_me": {
         "duration": 14.0,
@@ -560,9 +520,6 @@ ACTIONS = {
 # 4. INCOMPATIBILITÀ ESPLICITE
 # ==============================================================================
 EXPLICIT_INCOMPATIBILITIES = {
-    ("step_left", "step_left"),
-    ("step_right", "step_right"),
-
     # Non eseguire passi opposti consecutivi
     ("move_forward", "move_backward"),
     ("move_backward", "move_forward"),

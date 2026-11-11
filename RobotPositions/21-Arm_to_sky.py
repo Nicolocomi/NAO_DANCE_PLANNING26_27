@@ -1,6 +1,5 @@
 import math
 import sys
-import time
 
 from naoqi import ALProxy
 
@@ -17,7 +16,6 @@ def main(robot_ip, port):
         0.0,
     ]
     motion_proxy.angleInterpolation("RArm", arm_raised, 0.8, True)
-    time.sleep(1.0)
 
 
 if __name__ == "__main__":
