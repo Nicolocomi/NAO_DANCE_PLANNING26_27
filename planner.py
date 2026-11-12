@@ -19,12 +19,11 @@ Caratteristiche del Planning Musicale:
 - Ricerca A* multi-obiettivo, che bilancia durata, energia, varietà e ripetizioni.
 """
 
-import heapq
-import itertools
 import json
 import os
-from bisect import bisect_left
+
 import positions
+from nao_problem import NaoProblem
 
 # ==============================================================================
 # 1. STRUTTURA METRICO-MUSICALE DI "ONE MORE TIME" (DAFT PUNK)
@@ -115,6 +114,16 @@ DAFT_PUNK_SECTIONS = [
     }
 ]
 
+# These actions have dedicated, timed handlers in the Choregraphe exporter.
+EXECUTABLE_INTERMEDIATE_ACTIONS = {
+    "move_forward",
+    "move_backward",
+    "diagonal_left",
+    "diagonal_right",
+    "right_arm",
+    "union_arms",
+}
+
 
 # ==============================================================================
 # 3. RICERCA A* PER UN SINGOLO SEGMENTO MUSICALE
@@ -122,171 +131,19 @@ DAFT_PUNK_SECTIONS = [
 def a_star_music_segment(start_action, target_action, target_duration, target_energy,
                          global_used_intermediates, required_first_action=None,
                          required_actions=(), required_action_windows=None):
-    """
-    Cerca la sequenza a costo minimo con A*, usando la durata residua come
-    euristica ottimistica e rispettando transizioni, ritmo e passi richiesti.
-    """
-    target_post_dur = positions.get_duration(target_action)
-
-    if (required_first_action is None and not required_actions
-            and target_duration <= target_post_dur
-            and positions.is_transition_valid(start_action, target_action)):
-        return [target_action], set()
-
-    if (required_first_action is not None
-            and not positions.is_transition_valid(start_action, required_first_action)):
-        raise ValueError("Transizione non valida verso l'azione richiesta: %s" % required_first_action)
-
-    required_actions = tuple(required_actions)
-    required_action_windows = required_action_windows or {}
-    required_action_bits = {
-        action: 1 << index for index, action in enumerate(required_actions)
-    }
-    complete_required_mask = (1 << len(required_actions)) - 1
-    for action in required_actions:
-        if action not in positions.ACTIONS:
-            raise ValueError("Azione obbligatoria sconosciuta: %s" % action)
-    candidates = [
-        action for action, data in positions.ACTIONS.items()
-        if data.get("dance_phrase")
-        and (not data.get("cue_only") or action in required_action_bits)
-    ]
-    if any(action not in candidates for action in required_actions):
-        raise ValueError("Le azioni obbligatorie devono essere mosse candidate per A*.")
-
-    initial_path = (required_first_action,) if required_first_action else ()
-    initial_duration_ms = round(
-        positions.get_duration(required_first_action) * 1000
-    ) if required_first_action else 0
-    initial_action = required_first_action or start_action
-    action_bits = {action: 1 << index for index, action in enumerate(candidates)}
-    used_mask = action_bits.get(required_first_action, 0)
-    initial_required_mask = required_action_bits.get(required_first_action, 0)
-    initial_cost = 0.0
-    if required_first_action:
-        initial_cost += abs(
-            positions.get_energy(required_first_action) - target_energy
-        ) * 0.35
-
-    target_ms = round(target_duration * 1000)
-    target_post_ms = round(target_post_dur * 1000)
-    candidate_durations_ms = [
-        round(positions.get_duration(action) * 1000) for action in candidates
-    ]
-    max_action_ms = max(candidate_durations_ms)
-    upper_elapsed_ms = target_ms - target_post_ms + max_action_ms
-    reachable = [False] * (upper_elapsed_ms + 1)
-    reachable[0] = True
-    for elapsed in range(upper_elapsed_ms + 1):
-        if reachable[elapsed]:
-            for action_duration in candidate_durations_ms:
-                next_elapsed = elapsed + action_duration
-                if next_elapsed <= upper_elapsed_ms:
-                    reachable[next_elapsed] = True
-    reachable_sums = [
-        elapsed for elapsed, can_reach in enumerate(reachable) if can_reach
-    ]
-
-    def heuristic(elapsed_ms):
-        remaining_ms = target_ms - target_post_ms - elapsed_ms
-        index = bisect_left(reachable_sums, remaining_ms)
-        nearest_error_ms = abs(reachable_sums[min(index, len(reachable_sums) - 1)] - remaining_ms)
-        if index:
-            nearest_error_ms = min(
-                nearest_error_ms, abs(reachable_sums[index - 1] - remaining_ms)
-            )
-        return nearest_error_ms / 1000.0 * 8.0
-
-    initial_state = (
-        initial_action,
-        None,
-        initial_duration_ms,
-        used_mask,
-        initial_required_mask,
+    """Solve one song segment with the AIMA search library."""
+    problem = NaoProblem(
+        start_action=start_action,
+        target_action=target_action,
+        target_duration=target_duration,
+        target_energy=target_energy,
+        global_used_intermediates=global_used_intermediates,
+        executable_intermediate_actions=EXECUTABLE_INTERMEDIATE_ACTIONS,
+        required_first_action=required_first_action,
+        required_actions=required_actions,
+        required_action_windows=required_action_windows,
     )
-    serial = itertools.count()
-    open_set = [
-        (initial_cost + heuristic(initial_duration_ms), initial_cost,
-         next(serial), initial_state, initial_path)
-    ]
-    best_cost_by_state = {initial_state: initial_cost}
-    best_solution = None
-    best_score = float("inf")
-
-    while open_set:
-        estimated_total, path_cost, _, state, path = heapq.heappop(open_set)
-        if estimated_total >= best_score:
-            break
-        if path_cost != best_cost_by_state.get(state):
-            continue
-
-        (last_action, previous_action, elapsed_ms, mask, required_mask) = state
-        if (required_mask == complete_required_mask
-                and positions.is_transition_valid(last_action, target_action)):
-            timing_error = abs(target_ms - elapsed_ms - target_post_ms) / 1000.0
-            score = path_cost + timing_error * 8.0
-            if score < best_score:
-                best_score = score
-                best_solution = path + (target_action,)
-
-        if elapsed_ms + target_post_ms >= target_ms + max_action_ms:
-            continue
-
-        for next_action in candidates:
-            if not positions.is_transition_valid(last_action, next_action):
-                continue
-            if next_action in (last_action, previous_action):
-                continue
-
-            next_elapsed_ms = elapsed_ms + round(
-                positions.get_duration(next_action) * 1000
-            )
-            if next_elapsed_ms + target_post_ms > target_ms + max_action_ms:
-                continue
-
-            required_bit = required_action_bits.get(next_action, 0)
-            if required_bit and required_mask & required_bit:
-                continue
-            if required_bit and not required_mask & required_bit:
-                window = required_action_windows.get(next_action)
-                if window:
-                    start_seconds = elapsed_ms / 1000.0
-                    if not window[0] <= start_seconds <= window[1]:
-                        continue
-
-            next_mask = mask | action_bits[next_action]
-            repeated = bool(mask & action_bits[next_action])
-            edge_cost = abs(
-                positions.get_energy(next_action) - target_energy
-            ) * 0.35
-            if repeated:
-                edge_cost += 1.5
-            if next_action in global_used_intermediates:
-                edge_cost += 0.2
-            next_cost = path_cost + edge_cost
-
-            next_required_mask = required_mask | required_bit
-            next_state = (
-                next_action, last_action, next_elapsed_ms, next_mask, next_required_mask
-            )
-            if next_cost >= best_cost_by_state.get(next_state, float("inf")):
-                continue
-            best_cost_by_state[next_state] = next_cost
-            next_path = path + (next_action,)
-            priority = next_cost + heuristic(next_elapsed_ms)
-            heapq.heappush(
-                open_set,
-                (priority, next_cost, next(serial), next_state, next_path)
-            )
-
-    if best_solution is None:
-        raise ValueError("Nessuna sequenza valida per il segmento verso %s." % target_action)
-
-    newly_used = {
-        act for act in best_solution[:-1]
-        if positions.ACTIONS[act]["type"] in ("intermediate", "crg")
-    }
-    return list(best_solution), newly_used
+    return problem.solve()
 
 
 # ==============================================================================
@@ -300,7 +157,7 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         song_sections = DAFT_PUNK_SECTIONS
 
     full_action_sequence = [positions.START_POSITION]
-    global_used_intermediates = set()
+    global_intermediate_counts = {}
     total_running_time = positions.get_duration(positions.START_POSITION)
 
     total_sections = len(song_sections)
@@ -330,13 +187,16 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
             target_action=w_end,
             target_duration=allocated_budget,
             target_energy=sec["target_energy"],
-            global_used_intermediates=global_used_intermediates,
+            global_used_intermediates=global_intermediate_counts,
             required_first_action=sec.get("cue_action"),
             required_actions=sec.get("required_actions", ()),
             required_action_windows=sec.get("required_action_windows")
         )
 
-        global_used_intermediates.update(newly_used)
+        for action, count in newly_used.items():
+            global_intermediate_counts[action] = (
+                global_intermediate_counts.get(action, 0) + count
+            )
         full_action_sequence.extend(sub_sequence)
 
         for act in sub_sequence:
@@ -412,11 +272,6 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
             "servono altre frasi di danza." % remaining_slack
         )
 
-    global_used_intermediates = {
-        action for action in full_action_sequence
-        if positions.ACTIONS[action]["type"] in ("intermediate", "crg")
-    }
-
     # Creazione della timeline dettagliata con accenti musicali
     plan_steps = []
     current_t = 0.0
@@ -445,8 +300,13 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         current_t += dur
 
     plan_end_time = round(current_t, 2)
-    is_time_ok = abs(plan_end_time - target_total_time) <= 0.01
-    is_variety_ok = len(global_used_intermediates) >= min_distinct_intermediates
+    intermediate_usage = {}
+    for action in full_action_sequence:
+        if positions.ACTIONS[action]["type"] in ("intermediate", "crg"):
+            intermediate_usage[action] = intermediate_usage.get(action, 0) + 1
+
+    is_time_ok = abs(plan_end_time - target_total_time) <= 2.0
+    is_variety_ok = len(intermediate_usage) >= min_distinct_intermediates
 
     return {
         "song": DAFT_PUNK_SONG["title"],
@@ -454,7 +314,8 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         "bpm": DAFT_PUNK_SONG["bpm"],
         "steps": plan_steps,
         "total_time": plan_end_time,
-        "distinct_intermediates": sorted(list(global_used_intermediates)),
+        "distinct_intermediates": sorted(intermediate_usage),
+        "intermediate_usage": dict(sorted(intermediate_usage.items())),
         "is_time_ok": is_time_ok,
         "is_variety_ok": is_variety_ok
     }
@@ -524,13 +385,41 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
                 % (dur, t_end)
             )
         elif act == "move_forward":
-            steps_code.append('        try:\n            motionProxy.moveTo(0.12, 0.0, 0.0)\n        except Exception:\n            time.sleep(4.0)')
+            steps_code.append(
+                '        try:\n'
+                '            task_id = motionProxy.post.moveTo(0.12, 0.0, 0.0)\n'
+                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
+                '                print("move_forward interrotto alla deadline del passo.")\n'
+                '        except Exception as error:\n'
+                '            print("Errore move_forward: %%s" %% error)' % t_end
+            )
         elif act == "move_backward":
-            steps_code.append('        try:\n            motionProxy.moveTo(-0.12, 0.0, 0.0)\n        except Exception:\n            time.sleep(4.0)')
+            steps_code.append(
+                '        try:\n'
+                '            task_id = motionProxy.post.moveTo(-0.12, 0.0, 0.0)\n'
+                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
+                '                print("move_backward interrotto alla deadline del passo.")\n'
+                '        except Exception as error:\n'
+                '            print("Errore move_backward: %%s" %% error)' % t_end
+            )
         elif act == "diagonal_left":
-            steps_code.append('        try:\n            motionProxy.moveTo(0.10, 0.08, 0.0)\n        except Exception:\n            time.sleep(4.0)')
+            steps_code.append(
+                '        try:\n'
+                '            task_id = motionProxy.post.moveTo(0.10, 0.08, 0.0)\n'
+                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
+                '                print("diagonal_left interrotto alla deadline del passo.")\n'
+                '        except Exception as error:\n'
+                '            print("Errore diagonal_left: %%s" %% error)' % t_end
+            )
         elif act == "diagonal_right":
-            steps_code.append('        try:\n            motionProxy.moveTo(0.10, -0.08, 0.0)\n        except Exception:\n            time.sleep(4.0)')
+            steps_code.append(
+                '        try:\n'
+                '            task_id = motionProxy.post.moveTo(0.10, -0.08, 0.0)\n'
+                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
+                '                print("diagonal_right interrotto alla deadline del passo.")\n'
+                '        except Exception as error:\n'
+                '            print("Errore diagonal_right: %%s" %% error)' % t_end
+            )
         elif act == "sing_with_me":
             steps_code.append('        neck_left = arm_angles(10.0, 20.0, -80.0, -60.0, 40.0, 0.5)')
             steps_code.append('        strum_down = arm_angles(60.0, -10.0, 70.0, 85.0, -30.0, 0.8)')
@@ -558,16 +447,16 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
         elif act == "right_arm":
             steps_code.append('        r_up = arm_angles(-60.0, -40.0, 80.0, 20.0, 0.0, 0.9)')
             steps_code.append('        r_circle = arm_angles(-40.0, -60.0, 60.0, 50.0, 40.0, 0.9)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", r_up, 1.5, True)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", r_circle, 1.5, True)')
+            steps_code.append('        motionProxy.angleInterpolation("RArm", r_up, %.3f, True)' % (dur / 2.0))
+            steps_code.append('        motionProxy.angleInterpolation("RArm", r_circle, %.3f, True)' % (dur / 2.0))
         elif act == "arm_to_sky":
             steps_code.append(
                 '        play_dance_phrase("arm_to_sky", %.3f, choreography_start + %.2f)'
                 % (dur, t_end)
             )
         elif act == "union_arms":
-            steps_code.append('        motionProxy.post.angleInterpolation("LArm", arm_angles(10, 10, -80, -80, 0, 0.5), 1.5, True)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", arm_angles(10, -10, 80, 80, 0, 0.5), 1.5, True)')
+            steps_code.append('        motionProxy.post.angleInterpolation("LArm", arm_angles(10, 10, -80, -80, 0, 0.5), %.3f, True)' % dur)
+            steps_code.append('        motionProxy.angleInterpolation("RArm", arm_angles(10, -10, 80, 80, 0, 0.5), %.3f, True)' % dur)
         else:
             steps_code.append('        time.sleep(%.1f)' % dur)
 
@@ -622,6 +511,10 @@ class MyClass(GeneratedClass):
             self._deadline_cancel.set()
         if hasattr(self, "_motion_proxy"):
             try:
+                self._motion_proxy.stopMove()
+            except Exception as error:
+                print("Impossibile interrompere lo spostamento: %s" % error)
+            try:
                 self._motion_proxy.killAll()
             except Exception as error:
                 print("Impossibile interrompere i movimenti: %s" % error)
@@ -642,6 +535,19 @@ class MyClass(GeneratedClass):
         self._choreography_stop = choreography_stop
         self._deadline_cancel = deadline_cancel
 
+        def stop_robot_motion():
+            if not motion_proxy_holder:
+                return
+            motion_proxy = motion_proxy_holder[0]
+            try:
+                motion_proxy.stopMove()
+            except Exception as error:
+                print("Impossibile interrompere lo spostamento: %s" % error)
+            try:
+                motion_proxy.killAll()
+            except Exception as error:
+                print("Impossibile interrompere i movimenti: %s" % error)
+
         def enforce_deadline():
             while not deadline_cancel.is_set():
                 remaining = choreography_start + choreography_target_time - time.time()
@@ -652,12 +558,9 @@ class MyClass(GeneratedClass):
                 return
             deadline_expired.set()
             choreography_stop.set()
+            print("[LIMITE] 120 secondi raggiunti: arresto movimenti e coreografia.")
+            stop_robot_motion()
             self.onStopped()
-            if motion_proxy_holder:
-                try:
-                    motion_proxy_holder[0].killAll()
-                except Exception as error:
-                    print("Impossibile interrompere i movimenti: %s" % error)
 
         deadline_thread = threading.Thread(target=enforce_deadline)
         deadline_thread.daemon = True
@@ -703,10 +606,7 @@ class MyClass(GeneratedClass):
         self._motion_proxy = motionProxy
         motion_proxy_holder.append(motionProxy)
         if deadline_expired.is_set():
-            try:
-                motionProxy.killAll()
-            except Exception as error:
-                print("Impossibile interrompere i movimenti: %s" % error)
+            stop_robot_motion()
             return
 
         def arm_angles(pitch, roll, eyaw, eroll, wyaw=0.0, hand=0.0):
@@ -745,7 +645,7 @@ class MyClass(GeneratedClass):
             try:
                 task_id = postureProxy.post.goToPosture(name, speed)
                 completed = wait_for_task(
-                    postureProxy, task_id, deadline, motionProxy.killAll
+                    postureProxy, task_id, deadline, stop_robot_motion
                 )
                 if not completed:
                     print("Transizione a %s interrotta alla deadline." % name)
@@ -849,6 +749,10 @@ def print_plan_summary(plan_result):
         "SODDISFATTO [OK]" if plan_result["is_variety_ok"] else "FALLITO"
     ))
     print(" - Elenco intermedie: %s" % ", ".join(plan_result["distinct_intermediates"]))
+    print(" - Frequenza intermedie: %s" % ", ".join(
+        "%s x%d" % (action, count)
+        for action, count in sorted(plan_result["intermediate_usage"].items())
+    ))
     print("=" * 95)
 
 

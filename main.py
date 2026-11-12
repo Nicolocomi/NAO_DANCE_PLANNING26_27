@@ -49,6 +49,10 @@ def _stop_robot_motion(motion_proxy):
     if motion_proxy is None:
         return
     try:
+        motion_proxy.stopMove()
+    except Exception as error:
+        print("  [ERRORE] Impossibile interrompere lo spostamento: %s" % error)
+    try:
         motion_proxy.killAll()
     except Exception as error:
         print("  [ERRORE] Impossibile fermare i movimenti in corso: %s" % error)

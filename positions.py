@@ -397,7 +397,7 @@ ACTIONS = {
         "description": "Movimento sincrono ed energico con entrambe le braccia"
     },
     "arms_opening": {
-        "duration": 7.0,
+        "duration": 4.0,
         "energy": 3,
         "pre": STANDING,
         "post": STANDING,
@@ -406,7 +406,7 @@ ACTIONS = {
         "description": "Apertura solenne e rotazione simultanea delle braccia"
     },
     "union_arms": {
-        "duration": 7.0,
+        "duration": 4.0,
         "energy": 3,
         "pre": STANDING,
         "post": STANDING,
