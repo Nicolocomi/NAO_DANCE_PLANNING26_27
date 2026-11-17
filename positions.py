@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 positions.py - Modellazione dello Spazio degli Stati, Azioni e Vincoli per NAO.
 Fundamentals of Artificial Intelligence - NAO Planning Competition (UniBo)
@@ -66,6 +67,15 @@ DANCE_JOINTS = [
     "RShoulderPitch", "RShoulderRoll", "RElbowYaw", "RElbowRoll", "RWristYaw", "RHand",
     "HeadYaw", "HeadPitch"
 ]
+
+# Relative displacements keep the planner, Choregraphe export and standalone
+# runner on the same spatial paths.
+MOVE_TO_ACTIONS = {
+    "move_forward": (0.12, 0.0, 0.0),
+    "move_backward": (-0.12, 0.0, 0.0),
+    "diagonal_left": (0.10, 0.08, 0.0),
+    "diagonal_right": (0.10, -0.08, 0.0),
+}
 
 
 def _dance_pose(left, right, head_yaw=0.0, head_pitch=0.0):
@@ -157,6 +167,10 @@ _SEATED_SKY_ACCENT = _dance_pose(
     head_yaw=10,
     head_pitch=-3
 )
+_UNION = _dance_pose(
+    [42, 12, -76, -48, 0, 0.2],
+    [42, -12, 76, 48, 0, 0.2]
+)
 
 DANCE_PHRASES = {
     "disco_groove": [
@@ -189,14 +203,22 @@ DANCE_PHRASES = {
         _WIPE_REACH, _WIPE_ACROSS, _HELLO_LEFT, _NEUTRAL
     ],
     "arm_to_sky": [
-        _SKY_REACH, _SKY_REACH, _OPEN, _OPEN,
-        _SKY_REACH, _OPEN, _OPEN, _NEUTRAL
+        _SKY_REACH_ACCENT, _SKY_REACH, _OPEN, _SKY_REACH_ACCENT,
+        _SKY_REACH, _OPEN, _SKY_REACH_ACCENT, _NEUTRAL
+    ],
+    "right_arm": [
+        _SKY_REACH_ACCENT, _SKY_REACH, _OPEN, _SKY_REACH,
+        _SKY_REACH_ACCENT, _OPEN, _SKY_REACH, _NEUTRAL
+    ],
+    "union_arms": [
+        _OPEN, _UNION, _CROSS, _UNION,
+        _OPEN, _UNION, _CROSS, _NEUTRAL
     ],
     "seated_arm_to_sky": [
         _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
         _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
         _SEATED_SKY_REACH, _SEATED_SKY_ACCENT,
-        _SEATED_SKY_REACH, _SEATED_SKY_REACH
+        _SEATED_SKY_REACH, _SEATED_SKY_ACCENT
     ]
 }
 
@@ -234,7 +256,7 @@ ACTIONS = {
 
     # --- POSIZIONI OBBLIGATORIE (MANDATORY) ---
     "Sit": {
-        "duration": 6.0,
+        "duration": 7.0,
         "energy": 1,
         "pre": STANDING,
         "post": SITTING,
@@ -243,7 +265,7 @@ ACTIONS = {
         "description": "Il robot passa dalla posizione in piedi a seduta"
     },
     "SitRelax": {
-        "duration": 4.0,
+        "duration": 5.0,
         "energy": 1,
         "pre": SITTING,
         "post": SITTING,
@@ -276,6 +298,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "mandatory",
         "file": "RobotPositions/20-Wipe_forehead.py",
+        "motion_phrase": "wipe_forehead",
         "description": "Gesto di asciugarsi la fronte per la fatica dopo il ballo"
     },
     "Hello": {
@@ -285,6 +308,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "mandatory",
         "file": "RobotPositions/19-Hello.py",
+        "motion_phrase": "hello_wave",
         "description": "Gesto di saluto con la mano destra al pubblico"
     },
 
@@ -305,6 +329,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/2-Right_arm.py",
+        "dance_phrase": True,
         "description": "Rotazione disco-funk del braccio destro sopra la testa"
     },
     "arm_to_sky": {
@@ -314,6 +339,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/21-Arm_to_sky.py",
+        "dance_phrase": True,
         "description": "Alza il braccio destro verso il cielo sul primo 'One more time'"
     },
     "seated_arm_to_sky": {
@@ -412,6 +438,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/5-Union_arms.py",
+        "dance_phrase": True,
         "description": "Gesto di unione delle braccia al centro del petto"
     },
     "move_forward": {
@@ -421,6 +448,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/7-Move_forward.py",
+        "move_to": MOVE_TO_ACTIONS["move_forward"],
         "description": "3 passi a tempo in avanti verso la platea"
     },
     "move_backward": {
@@ -430,6 +458,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/8-Move_backward.py",
+        "move_to": MOVE_TO_ACTIONS["move_backward"],
         "description": "3 passi ritmati all'indietro tornando al centro"
     },
     "diagonal_left": {
@@ -439,6 +468,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/9-Diagonal_left.py",
+        "move_to": MOVE_TO_ACTIONS["diagonal_left"],
         "description": "Passo diagonale scenografico a sinistra"
     },
     "diagonal_right": {
@@ -448,6 +478,7 @@ ACTIONS = {
         "post": STANDING,
         "type": "intermediate",
         "file": "RobotPositions/10-Diagonal_right.py",
+        "move_to": MOVE_TO_ACTIONS["diagonal_right"],
         "description": "Passo diagonale scenografico a destra"
     },
     "rotation_foot_Lleg": {
@@ -539,6 +570,19 @@ def get_duration(action_name):
     if action_name in ACTIONS:
         return ACTIONS[action_name]["duration"]
     raise KeyError("Azione sconosciuta: %s" % action_name)
+
+
+def get_motion_phrase(action_name):
+    """Return the shared keyframe phrase for a choreographed action."""
+    data = ACTIONS.get(action_name)
+    if data is None:
+        raise KeyError("Azione sconosciuta: %s" % action_name)
+    if data.get("motion_phrase"):
+        return data["motion_phrase"]
+    if data.get("dance_phrase"):
+        return action_name
+    return None
+
 
 def get_energy(action_name):
     """Restituisce il livello energetico (1-5) dell'azione."""

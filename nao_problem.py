@@ -22,6 +22,7 @@ _State = namedtuple(
 DIVERSITY_REPEAT_PENALTY = 4.0
 GLOBAL_REUSE_PENALTY = 1.5
 MAX_INTERMEDIATE_USES = 2
+SPATIAL_MOVEMENT_COST_FACTOR = 0.6
 
 
 class NaoProblem(Problem):
@@ -51,7 +52,8 @@ class NaoProblem(Problem):
         self.candidates = [
             action
             for action, data in positions.ACTIONS.items()
-            if (
+            if data["type"] in ("intermediate", "crg")
+            and (
                 data.get("dance_phrase")
                 or action in executable_intermediate_actions
             )
@@ -197,6 +199,8 @@ class NaoProblem(Problem):
         edge_cost = abs(
             positions.get_energy(action) - self.target_energy
         ) * 0.35
+        if action in positions.MOVE_TO_ACTIONS:
+            edge_cost *= SPATIAL_MOVEMENT_COST_FACTOR
         if repeated:
             edge_cost += DIVERSITY_REPEAT_PENALTY
         edge_cost += GLOBAL_REUSE_PENALTY * prior_uses

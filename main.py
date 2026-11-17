@@ -24,7 +24,6 @@ import planner
 
 # La posa finale occupa la finestra riservata prima del limite assoluto.
 TARGET_TIME_SECONDS = 120.0
-CROUCH_DURATION_SECONDS = planner.positions.get_duration("Crouch")
 MUSIC_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "music.mp3")
 
 # Tentativo di importazione di NAOqi (presente nell'ambiente Choregraphe/Python 2.7)
@@ -164,19 +163,35 @@ def _play_dance_phrase(motion_proxy, phrase_name, duration, deadline):
     return completed
 
 
+def _wait_with_motion(deadline, motion_proxy, posture):
+    remaining = deadline - time.monotonic()
+    if remaining < 0.75 or motion_proxy is None:
+        _sleep_until(deadline)
+        return
+
+    phrase_name = (
+        "seated_arm_to_sky"
+        if posture == planner.positions.SITTING
+        else "disco_groove"
+        if posture == planner.positions.STANDING
+        else None
+    )
+    if phrase_name is None:
+        _sleep_until(deadline)
+        return
+    if not _play_dance_phrase(motion_proxy, phrase_name, remaining, deadline):
+        print(
+            "  [AVVISO] Impossibile eseguire il movimento di raccordo; "
+            "mantengo la posa fino alla prossima battuta."
+        )
+        _sleep_until(deadline)
+
+
 def _execute_builtin_action(step_info, deadline, motion_proxy, posture_proxy):
     action_name = step_info["action"]
     duration = step_info["duration"]
 
-    phrase_name = None
-    if planner.positions.ACTIONS[action_name].get("dance_phrase"):
-        phrase_name = action_name
-    elif action_name == "Hello":
-        phrase_name = "hello_wave"
-    elif action_name == "Wipe Forehead":
-        phrase_name = "wipe_forehead"
-    elif action_name == "arm_to_sky":
-        phrase_name = "arm_to_sky"
+    phrase_name = planner.positions.get_motion_phrase(action_name)
 
     if phrase_name is not None:
         if motion_proxy is None:
@@ -189,7 +204,7 @@ def _execute_builtin_action(step_info, deadline, motion_proxy, posture_proxy):
             print("  [ERRORE] Proxy ALRobotPosture non disponibile per '%s'." % action_name)
             return False
         try:
-            task_id = posture_proxy.post.goToPosture(action_name, 0.65)
+            task_id = posture_proxy.post.goToPosture(action_name, 1.0)
             if not _wait_for_task(
                     posture_proxy, task_id, deadline,
                     lambda: _stop_robot_motion(motion_proxy)):
@@ -198,7 +213,28 @@ def _execute_builtin_action(step_info, deadline, motion_proxy, posture_proxy):
         except Exception as error:
             print("  [ERRORE] Transizione a '%s' fallita: %s" % (action_name, error))
             return False
-        _sleep_until(deadline)
+        _wait_with_motion(deadline, motion_proxy, step_info["posture"])
+        return True
+
+    if action_name in planner.positions.MOVE_TO_ACTIONS:
+        if motion_proxy is None:
+            print("  [ERRORE] Proxy ALMotion non disponibile per '%s'." % action_name)
+            return False
+        try:
+            task_id = motion_proxy.post.moveTo(
+                *planner.positions.MOVE_TO_ACTIONS[action_name]
+            )
+            if not _wait_for_task(
+                    motion_proxy, task_id, deadline,
+                    lambda: motion_proxy.stop(task_id)):
+                print("  [LIMITE] Spostamento '%s' interrotto alla scadenza." % action_name)
+                _stop_robot_motion(motion_proxy)
+                return False
+        except Exception as error:
+            print("  [ERRORE] Spostamento '%s' fallito: %s" % (action_name, error))
+            _stop_robot_motion(motion_proxy)
+            return False
+        _wait_with_motion(deadline, motion_proxy, step_info["posture"])
         return True
 
     return None
@@ -252,7 +288,7 @@ def execute_action(step_info, robot_ip, port, dry_run=False, deadline=None,
             print("  [ERRORE] Proxy ALRobotPosture non disponibile: impossibile garantire Crouch.")
             return False
         try:
-            task_id = posture_proxy.post.goToPosture("Crouch", 0.6)
+            task_id = posture_proxy.post.goToPosture("Crouch", 1.0)
             if not _wait_for_task(
                     posture_proxy, task_id, action_end,
                     lambda: _stop_robot_motion(motion_proxy)):
@@ -366,7 +402,11 @@ def main():
     plan_result = planner.plan_choreography(target_total_time=TARGET_TIME_SECONDS)
     planner.print_plan_summary(plan_result)
 
-    if not plan_result["is_time_ok"] or not plan_result["is_variety_ok"]:
+    if (
+        not plan_result["is_time_ok"]
+        or not plan_result["is_variety_ok"]
+        or not plan_result["is_space_ok"]
+    ):
         print("[ERRORE] Il piano non soddisfa tutti i vincoli della competizione!")
         sys.exit(1)
 
@@ -394,23 +434,24 @@ def main():
     print("\n[3/3] Premi INVIO per avviare musica e coreografia insieme...")
     sys.stdin.readline()
 
-    start_wall_time = time.monotonic()
     try:
         music_process = _start_music(disabled=args.no_music)
     except (IOError, RuntimeError) as error:
         print("[ERRORE] %s" % error)
         sys.exit(1)
 
+    start_wall_time = time.monotonic()
     print("\n" + "#" * 80)
     print("        INIZIO COREOGRAFIA NAO - SINCRONIZZAZIONE AL SECONDO ZERO")
     print("#" * 80)
 
-    crouch_start = start_wall_time + TARGET_TIME_SECONDS - CROUCH_DURATION_SECONDS
+    steps = plan_result["steps"]
+    crouch_step = steps[-1]
+    crouch_start = start_wall_time + crouch_step["start_time"]
     hard_deadline = start_wall_time + TARGET_TIME_SECONDS
     deadline_reached, cancel_watchdog = _start_deadline_watchdog(
         hard_deadline, motion, music_process
     )
-    steps = plan_result["steps"]
     forced_crouch = False
     completed_steps = []
 
@@ -444,7 +485,6 @@ def main():
         print("\n[LIMITE] Interrompo le altre mosse e riservo il finale al Crouch.")
         _stop_robot_motion(motion)
 
-    crouch_step = steps[-1]
     if time.monotonic() < hard_deadline and not deadline_reached.is_set():
         _sleep_until(crouch_start)
         if time.monotonic() < hard_deadline and not deadline_reached.is_set():

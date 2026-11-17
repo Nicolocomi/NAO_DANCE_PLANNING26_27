@@ -24,10 +24,11 @@ def _motion_proxy(robot_ip, port):
     return ALProxy("ALMotion", robot_ip, port)
 
 
-def run_dance_phrase(action_name, robot_ip, port):
+def run_dance_phrase(action_name, robot_ip, port, duration=None):
     motion_proxy = _motion_proxy(robot_ip, port)
     poses = positions.DANCE_PHRASES[action_name]
-    duration = positions.get_duration(action_name)
+    if duration is None:
+        duration = positions.get_duration(action_name)
     frame_times = [
         duration * frame / float(len(poses))
         for frame in range(1, len(poses) + 1)
@@ -47,7 +48,32 @@ def run_dance_phrase(action_name, robot_ip, port):
 
 
 def run_action(action_name, robot_ip, port):
-    run_dance_phrase(action_name, robot_ip, port)
+    phrase_name = positions.get_motion_phrase(action_name)
+    if phrase_name is not None:
+        run_dance_phrase(
+            phrase_name,
+            robot_ip,
+            port,
+            positions.get_duration(action_name),
+        )
+        return
+
+    if action_name in positions.MOVE_TO_ACTIONS:
+        motion_proxy = _motion_proxy(robot_ip, port)
+        motion_proxy.moveTo(*positions.MOVE_TO_ACTIONS[action_name])
+        return
+
+    action_data = positions.ACTIONS.get(action_name)
+    if action_data and action_data["type"] in ("start", "goal", "mandatory"):
+        if ALProxy is None:
+            raise RuntimeError(
+                "NAOqi non disponibile: eseguire lo script nell'ambiente del robot."
+            )
+        posture_proxy = ALProxy("ALRobotPosture", robot_ip, port)
+        posture_proxy.goToPosture(action_name, 1.0)
+        return
+
+    raise ValueError("Azione non eseguibile: %s" % action_name)
 
 
 def run_from_command_line(action_name):

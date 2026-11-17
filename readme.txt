@@ -27,13 +27,15 @@ Movimenti:
   27 Arm_wave_combo; 28 Party_punches; 29 Climax_reach.
 - Gli script 23-29 sono eseguibili singolarmente e condividono
   RobotPositions/action_runner.py per le chiamate NAOqi e le pose definite
-  in positions.py.
+  in positions.py. Anche gli script delle pose obbligatorie e degli
+  spostamenti selezionabili dal planner inoltrano a questo runner.
 - RobotPositions/choregraphe_test_box.py contiene un box Python di prova:
-  copiarne il contenuto in un box Python di Choregraphe e cambiare ACTION
-  per provare una singola azione (tutte le 27 azioni .py e le 4 animazioni
-  .crg); il tempo viene stampato nel Log Viewer. Le .crg devono essere
-  installate nel robot virtuale. arm_dance è un box Choregraphe, non un file
-  locale, e non è incluso nel box di prova.
+  viene rigenerato da planner.py con le stesse pose, durate e traiettorie
+  spaziali del planner. Copiarlo in un box Python di Choregraphe e cambiare
+  ACTION per provare una mossa pianificabile; il tempo viene stampato nel
+  Log Viewer.
+- Le animazioni .crg e gli script storici non eseguibili dal runner comune
+  restano nel catalogo come materiale del progetto, ma A* non li seleziona.
 - timing_trials/: istruzioni e tabella CSV per misurare tutte le azioni,
   annotare tre prove e aggiornare le durate in positions.py.
 - Il planner inserisce Arm_to_sky all'inizio della prima strofa, sul primo
@@ -42,11 +44,14 @@ Movimenti:
   diagonali, usando le durate del catalogo. Penalizza le ripetizioni nella
   stessa sezione, riutilizza meno le mosse già eseguite e limita ogni
   intermedia a due esecuzioni nella coreografia.
-- Le durate del catalogo sono stime: il piano viene allineato al target di
-  120 secondi (tolleranza di pianificazione ±2s), ma il tempo fisico dipende
-  dal robot e va verificato nel simulatore.
-- RobotPositions/cgrFiles/ contiene le quattro animazioni Choregraphe
-  usate come azioni: birthday_dance_no_sound, sing_with_me, sprinkler e workout.
+- Le durate del catalogo sono stime: il piano termina a 120 secondi e
+  riserva gli ultimi 6 secondi (da 114s) al Crouch, eseguito a velocita' 1.0.
+  La durata stimata del movimento Crouch nel catalogo rimane 4 secondi.
+  Le prove nel CSV non sono ancora state misurate: la durata fisica va
+  verificata nel simulatore prima di considerare garantito il finale.
+- RobotPositions/cgrFiles/ contiene animazioni Choregraphe storiche:
+  birthday_dance_no_sound, sing_with_me, sprinkler e workout. Non fanno parte
+  del piano A* attuale, che evita azioni senza handler garantito.
 - music.mp3: colonna sonora One More Time, tagliata a 120 secondi.
 
 Progetto Choregraphe:
@@ -87,10 +92,12 @@ COME USARLO
    - Quando richiesto, premere INVIO: `main.py` avvia `music.mp3` e la
      coreografia insieme in background tramite `afplay` su macOS.
    - Sostituire IP e porta con i valori mostrati da Choregraphe.
-   - L'esecuzione ha un limite fisso di 120 secondi: gli ultimi 4 secondi
-     (da 116s) sono riservati al Crouch. Se una mossa sfora il proprio intervallo,
-     le mosse successive vengono saltate e il runner passa al Crouch.
-   - Dopo `StandInit`, `disco_groove` parte senza una pausa iniziale aggiunta.
+   - L'esecuzione ha un limite fisso di 120 secondi: gli ultimi 6 secondi
+     (da 114s) sono riservati al Crouch. Se una mossa supera il suo intervallo,
+     il runner la interrompe e tenta comunque il finale all'orario previsto.
+   - Se un'azione termina prima della battuta successiva, il runner usa una
+     breve frase di raccordo in piedi o da seduto, evitando di lasciare il
+     robot fermo in attesa.
    - Il piano è generato dinamicamente con A* dai vincoli musicali, dalle
      pose obbligatorie e dalle transizioni ammesse; choreography_plan.json
      è solo un output rigenerabile.
@@ -104,9 +111,10 @@ Dopo aver rigenerato il progetto con `python3 planner.py`, ricaricare il
 progetto in Choregraphe prima di usare Play, altrimenti si potrebbe eseguire
 la copia del comportamento già caricata in memoria.
 Per sincronizzare musica e robot usa `main.py`. Il comportamento .xar
-generato fa partire il timer appena riceve Play (prima della connessione ai
-proxy), assegna una deadline a ogni mossa, avvia il Crouch al secondo 116 e
-invia onStopped e ALMotion.killAll al secondo 120.
+generato connette i proxy prima di avviare il timer, assegna una deadline a
+ogni mossa, avvia il Crouch al secondo 114 e interrompe i movimenti al secondo
+120. Il piano e il comportamento .xar sono generati dalla stessa sequenza A*;
+le prove nel simulatore restano necessarie per verificare i tempi reali.
 Il pulsante Stop invia `ALMotion.killAll()` per interrompere subito i movimenti
 attivi. La deadline impedisce al software di continuare oltre 120 secondi,
 ma il raggiungimento fisico della posa dipende dalla risposta del robot e va

@@ -36,6 +36,10 @@ DAFT_PUNK_SONG = {
     "total_target_time": 120.0
 }
 
+# Reserve a little extra time beyond the estimated Crouch motion duration.
+GOAL_RESERVE_SECONDS = max(6.0, positions.get_duration(positions.GOAL_POSITION))
+MIN_DISTINCT_SPATIAL_ACTIONS = 3
+
 DAFT_PUNK_SECTIONS = [
     {
         "id": 1,
@@ -114,14 +118,7 @@ DAFT_PUNK_SECTIONS = [
 ]
 
 # These actions have dedicated, timed handlers in the Choregraphe exporter.
-EXECUTABLE_INTERMEDIATE_ACTIONS = {
-    "move_forward",
-    "move_backward",
-    "diagonal_left",
-    "diagonal_right",
-    "right_arm",
-    "union_arms",
-}
+EXECUTABLE_INTERMEDIATE_ACTIONS = set(positions.MOVE_TO_ACTIONS)
 
 
 # ==============================================================================
@@ -206,7 +203,7 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
     if not full_action_sequence or full_action_sequence[-1] != positions.GOAL_POSITION:
         raise ValueError("La coreografia deve terminare con la posizione Crouch.")
 
-    goal_start_time = target_total_time - positions.get_duration(positions.GOAL_POSITION)
+    goal_start_time = target_total_time - GOAL_RESERVE_SECONDS
     if goal_start_time < 0:
         raise ValueError("Durata target insufficiente per raggiungere la posizione Crouch.")
 
@@ -223,6 +220,16 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         for idx in range(len(full_action_sequence) - 2, 0, -1):
             action = full_action_sequence[idx]
             if action in protected_actions or positions.ACTIONS[action]["type"] not in ("intermediate", "crg"):
+                continue
+            remaining_spatial_actions = {
+                candidate
+                for index, candidate in enumerate(full_action_sequence)
+                if index != idx and candidate in positions.MOVE_TO_ACTIONS
+            }
+            if (
+                action in positions.MOVE_TO_ACTIONS
+                and len(remaining_spatial_actions) < MIN_DISTINCT_SPATIAL_ACTIONS
+            ):
                 continue
             if positions.is_transition_valid(full_action_sequence[idx - 1], full_action_sequence[idx + 1]):
                 removable_index = idx
@@ -241,6 +248,7 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         idx: positions.get_duration(action)
         for idx, action in enumerate(full_action_sequence)
     }
+    planned_durations[len(full_action_sequence) - 1] = GOAL_RESERVE_SECONDS
     dance_actions = [
         idx for idx, action in enumerate(full_action_sequence[:-1])
         if positions.ACTIONS[action].get("dance_phrase")
@@ -304,6 +312,10 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
 
     is_time_ok = abs(plan_end_time - target_total_time) <= 2.0
     is_variety_ok = len(intermediate_usage) >= min_distinct_intermediates
+    distinct_spatial_actions = sorted(
+        action for action in intermediate_usage if action in positions.MOVE_TO_ACTIONS
+    )
+    is_space_ok = len(distinct_spatial_actions) >= MIN_DISTINCT_SPATIAL_ACTIONS
 
     return {
         "song": DAFT_PUNK_SONG["title"],
@@ -313,8 +325,10 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
         "total_time": plan_end_time,
         "distinct_intermediates": sorted(intermediate_usage),
         "intermediate_usage": dict(sorted(intermediate_usage.items())),
+        "distinct_spatial_actions": distinct_spatial_actions,
         "is_time_ok": is_time_ok,
-        "is_variety_ok": is_variety_ok
+        "is_variety_ok": is_variety_ok,
+        "is_space_ok": is_space_ok
     }
 
 
@@ -327,13 +341,25 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
     steps_code = []
     for step in plan_result["steps"]:
         act = step["action"]
-        desc = step["description"]
         dur = step["duration"]
         t_start = step["start_time"]
         t_end = step["end_time"]
         step_num = step["step"]
         sec_name = step.get("section", "")
         lyric = step.get("lyric_cue", "")
+        previous_step = (
+            plan_result["steps"][step_num - 2] if step_num > 1 else None
+        )
+        previous_posture = (
+            previous_step["posture"] if previous_step is not None else None
+        )
+        filler_phrase = (
+            "seated_arm_to_sky"
+            if previous_posture == positions.SITTING
+            else "disco_groove"
+            if previous_posture == positions.STANDING
+            else None
+        )
 
         steps_code.append("        # ======================================================================")
         steps_code.append("        # PASSO %02d [%s]: %s (%.1fs -> %.1fs)" % (step_num, sec_name, act, t_start, t_end))
@@ -341,20 +367,33 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
         steps_code.append("        # ======================================================================")
         if act != "Crouch":
             steps_code.append("        if choreography_stop.is_set(): return")
+            if filler_phrase:
+                steps_code.append(
+                    '        if not wait_until(choreography_start + %.2f, "%s" if last_action_completed else None): return'
+                    % (t_start, filler_phrase)
+                )
+            else:
+                steps_code.append(
+                    '        if not wait_until(choreography_start + %.2f): return'
+                    % t_start
+                )
+        if act == positions.START_POSITION:
             steps_code.append(
-                '        if not wait_until(choreography_start + %.2f): return'
-                % t_start
-            )
-        if act == "StandInit":
-            steps_code.append(
-                '        run_posture_action("StandInit", 0.65, choreography_start + %.2f)'
+                '        last_action_completed = run_posture_action("StandInit", 1.0, choreography_start + %.2f)'
                 % t_end
             )
-        elif act == "Crouch":
-            steps_code.append(
-                '        if not wait_until(choreography_start + crouch_start_time): return'
-            )
-            steps_code.append('        crouch_ok = run_posture_action("Crouch", 0.6, choreography_start + choreography_target_time)')
+            steps_code.append('        if not last_action_completed: print("StandInit non completato.")')
+        elif act == positions.GOAL_POSITION:
+            if filler_phrase:
+                steps_code.append(
+                    '        if not wait_until(choreography_start + crouch_start_time, "%s" if last_action_completed else None): return'
+                    % filler_phrase
+                )
+            else:
+                steps_code.append(
+                    '        if not wait_until(choreography_start + crouch_start_time): return'
+                )
+            steps_code.append('        crouch_ok = run_posture_action("Crouch", 1.0, choreography_start + choreography_target_time)')
             steps_code.append('        if not crouch_ok:')
             steps_code.append('            print("Errore: Crouch non completato entro il limite di 120 secondi.")')
             steps_code.append(
@@ -363,117 +402,30 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
             steps_code.append('        choreography_stop.set()')
         elif act in ("Sit", "SitRelax", "Stand", "StandZero"):
             steps_code.append(
-                '        run_posture_action("%s", 0.65, choreography_start + %.2f)'
+                '        last_action_completed = run_posture_action("%s", 1.0, choreography_start + %.2f)'
                 % (act, t_end)
             )
-        elif positions.ACTIONS[act].get("dance_phrase"):
+            steps_code.append('        if not last_action_completed: print("%s non completata.")' % act)
+        elif positions.get_motion_phrase(act):
+            phrase_name = positions.get_motion_phrase(act)
             steps_code.append(
-                '        play_dance_phrase("%s", %.3f, choreography_start + %.2f)'
-                % (act, dur, t_end)
+                '        last_action_completed = play_dance_phrase("%s", %.3f, choreography_start + %.2f)'
+                % (phrase_name, dur, t_end)
             )
-        elif act == "Hello":
+            steps_code.append('        if not last_action_completed: print("Azione %s non completata.")' % act)
+        elif act in positions.MOVE_TO_ACTIONS:
+            displacement = positions.MOVE_TO_ACTIONS[act]
             steps_code.append(
-                '        play_dance_phrase("hello_wave", %.3f, choreography_start + %.2f)'
-                % (dur, t_end)
+                '        last_action_completed = run_move_action("%s", %r, choreography_start + %.2f)'
+                % (act, displacement, t_end)
             )
-        elif act == "Wipe Forehead":
-            steps_code.append(
-                '        play_dance_phrase("wipe_forehead", %.3f, choreography_start + %.2f)'
-                % (dur, t_end)
-            )
-        elif act == "move_forward":
-            steps_code.append(
-                '        try:\n'
-                '            task_id = motionProxy.post.moveTo(0.12, 0.0, 0.0)\n'
-                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
-                '                print("move_forward interrotto alla deadline del passo.")\n'
-                '        except Exception as error:\n'
-                '            print("Errore move_forward: %%s" %% error)' % t_end
-            )
-        elif act == "move_backward":
-            steps_code.append(
-                '        try:\n'
-                '            task_id = motionProxy.post.moveTo(-0.12, 0.0, 0.0)\n'
-                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
-                '                print("move_backward interrotto alla deadline del passo.")\n'
-                '        except Exception as error:\n'
-                '            print("Errore move_backward: %%s" %% error)' % t_end
-            )
-        elif act == "diagonal_left":
-            steps_code.append(
-                '        try:\n'
-                '            task_id = motionProxy.post.moveTo(0.10, 0.08, 0.0)\n'
-                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
-                '                print("diagonal_left interrotto alla deadline del passo.")\n'
-                '        except Exception as error:\n'
-                '            print("Errore diagonal_left: %%s" %% error)' % t_end
-            )
-        elif act == "diagonal_right":
-            steps_code.append(
-                '        try:\n'
-                '            task_id = motionProxy.post.moveTo(0.10, -0.08, 0.0)\n'
-                '            if not wait_for_task(motionProxy, task_id, choreography_start + %.2f, stop_robot_motion):\n'
-                '                print("diagonal_right interrotto alla deadline del passo.")\n'
-                '        except Exception as error:\n'
-                '            print("Errore diagonal_right: %%s" %% error)' % t_end
-            )
-        elif act == "sing_with_me":
-            steps_code.append('        neck_left = arm_angles(10.0, 20.0, -80.0, -60.0, 40.0, 0.5)')
-            steps_code.append('        strum_down = arm_angles(60.0, -10.0, 70.0, 85.0, -30.0, 0.8)')
-            steps_code.append('        strum_up = arm_angles(40.0, -15.0, 60.0, 65.0, 20.0, 0.8)')
-            steps_code.append('        motionProxy.post.angleInterpolation("LArm", neck_left, 1.2, True)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", strum_down, 1.2, True)')
-            steps_code.append('        for _ in range(6):\n            motionProxy.angleInterpolation("RArm", strum_up, 0.45, True)\n            motionProxy.angleInterpolation("RArm", strum_down, 0.45, True)')
-            steps_code.append('        postureProxy.goToPosture("StandInit", 0.6)')
-        elif act == "workout":
-            steps_code.append('        for _ in range(3):')
-            steps_code.append('            motionProxy.post.angleInterpolation("LArm", arm_angles(-30, 20, -30, -20, 0, 0), 1.2, True)')
-            steps_code.append('            motionProxy.angleInterpolation("RArm", arm_angles(-30, -20, 30, 20, 0, 0), 1.2, True)\n            time.sleep(0.4)')
-            steps_code.append('            motionProxy.post.angleInterpolation("LArm", arm_angles(30, 15, -70, -85, 0, 0.8), 1.2, True)')
-            steps_code.append('            motionProxy.angleInterpolation("RArm", arm_angles(30, -15, 70, 85, 0, 0.8), 1.2, True)\n            time.sleep(0.4)')
-        elif act == "birthday_dance":
-            steps_code.append('        for _ in range(3):')
-            steps_code.append('            motionProxy.post.angleInterpolation("LArm", arm_angles(20, 45, -60, -80, 0, 0.8), 1.2, True)')
-            steps_code.append('            motionProxy.angleInterpolation("RArm", arm_angles(20, -45, 60, 80, 0, 0.8), 1.2, True)\n            time.sleep(0.3)')
-            steps_code.append('            motionProxy.post.angleInterpolation("LArm", arm_angles(40, 20, -80, -30, -30, 0.5), 1.0, True)')
-            steps_code.append('            motionProxy.angleInterpolation("RArm", arm_angles(20, -10, 40, 60, 30, 0.5), 1.0, True)\n            time.sleep(0.3)')
-        elif act == "rotation_foot_Lleg":
-            steps_code.append('        try:\n            motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, 0.05], 3.0, False)\n            time.sleep(2.0)\n        except Exception:\n            time.sleep(5.0)')
-        elif act == "rotation_foot_Rleg":
-            steps_code.append('        try:\n            motionProxy.angleInterpolation("Torso", [0, 0, 0, 0, 0, -0.05], 3.0, False)\n            time.sleep(2.0)\n        except Exception:\n            time.sleep(5.0)')
-        elif act == "right_arm":
-            steps_code.append('        r_up = arm_angles(-60.0, -40.0, 80.0, 20.0, 0.0, 0.9)')
-            steps_code.append('        r_circle = arm_angles(-40.0, -60.0, 60.0, 50.0, 40.0, 0.9)')
-            steps_code.append('        motionProxy.angleInterpolation("RArm", r_up, %.3f, True)' % (dur / 2.0))
-            steps_code.append('        motionProxy.angleInterpolation("RArm", r_circle, %.3f, True)' % (dur / 2.0))
-        elif act == "arm_to_sky":
-            steps_code.append(
-                '        play_dance_phrase("arm_to_sky", %.3f, choreography_start + %.2f)'
-                % (dur, t_end)
-            )
-        elif act == "union_arms":
-            steps_code.append('        motionProxy.post.angleInterpolation("LArm", arm_angles(10, 10, -80, -80, 0, 0.5), %.3f, True)' % dur)
-            steps_code.append('        motionProxy.angleInterpolation("RArm", arm_angles(10, -10, 80, 80, 0, 0.5), %.3f, True)' % dur)
+            steps_code.append('        if not last_action_completed: print("Azione %s non completata.")' % act)
         else:
-            steps_code.append('        time.sleep(%.1f)' % dur)
+            raise ValueError(
+                "L'azione pianificata '%s' non ha un handler eseguibile." % act
+            )
 
-    raw_steps_python = "\n".join(steps_code)
-    guarded_steps = []
-    actuator_prefixes = (
-        "motionProxy.", "postureProxy.", "play_dance_phrase(",
-        "run_posture_action(", "time.sleep("
-    )
-    for line in raw_steps_python.splitlines():
-        stripped_line = line.lstrip()
-        if stripped_line.startswith(actuator_prefixes):
-            indentation = line[:len(line) - len(stripped_line)]
-            guarded_steps.append(indentation + "if choreography_stop.is_set(): return")
-        guarded_steps.append(line)
-        if stripped_line.startswith(actuator_prefixes):
-            indentation = line[:len(line) - len(stripped_line)]
-            guarded_steps.append(indentation + "if choreography_stop.is_set(): return")
-
-    all_steps_python = "\n".join(guarded_steps)
+    all_steps_python = "\n".join(steps_code)
 
     xar_template = '''<?xml version="1.0" encoding="UTF-8" ?>
 <ChoregrapheProject xmlns="http://www.aldebaran-robotics.com/schema/choregraphe/project.xsd" xar_version="3">
@@ -516,19 +468,21 @@ class MyClass(GeneratedClass):
             except Exception as error:
                 print("Impossibile interrompere i movimenti: %s" % error)
         self.onUnload()
-        self.onStopped()
+        if not getattr(self, "_stop_sent", False):
+            self._stop_sent = True
+            self.onStopped()
 
     def onInput_onStart(self):
         # NOTA: La musica va avviata ESTERNAMENTE (da main.py o manualmente).
         # NON usare subprocess/os dentro Choregraphe: crasha il simulatore.
 
-        choreography_start = time.time()
         choreography_target_time = __TARGET_TIME__
         crouch_start_time = __CROUCH_START_TIME__
         choreography_stop = threading.Event()
         deadline_expired = threading.Event()
         deadline_cancel = threading.Event()
         motion_proxy_holder = []
+        self._stop_sent = False
         self._choreography_stop = choreography_stop
         self._deadline_cancel = deadline_cancel
 
@@ -545,6 +499,11 @@ class MyClass(GeneratedClass):
             except Exception as error:
                 print("Impossibile interrompere i movimenti: %s" % error)
 
+        def notify_stopped():
+            if not self._stop_sent:
+                self._stop_sent = True
+                self.onStopped()
+
         def enforce_deadline():
             while not deadline_cancel.is_set():
                 remaining = choreography_start + choreography_target_time - time.time()
@@ -557,11 +516,7 @@ class MyClass(GeneratedClass):
             choreography_stop.set()
             print("[LIMITE] 120 secondi raggiunti: arresto movimenti e coreografia.")
             stop_robot_motion()
-            self.onStopped()
-
-        deadline_thread = threading.Thread(target=enforce_deadline)
-        deadline_thread.daemon = True
-        deadline_thread.start()
+            notify_stopped()
 
         proxy_result = {}
         proxy_error = []
@@ -585,46 +540,63 @@ class MyClass(GeneratedClass):
         proxy_thread = threading.Thread(target=connect_proxies)
         proxy_thread.daemon = True
         proxy_thread.start()
-        while not proxy_ready.is_set() and not choreography_stop.is_set():
-            remaining = choreography_start + choreography_target_time - time.time()
-            if remaining <= 0:
-                break
-            time.sleep(min(0.01, remaining))
-        if not proxy_ready.is_set() or choreography_stop.is_set():
+        proxy_ready.wait(15.0)
+        if not proxy_ready.is_set():
+            print("Connessione ai proxy NAOqi scaduta dopo 15 secondi.")
+            deadline_cancel.set()
+            choreography_stop.set()
+            notify_stopped()
             return
         if proxy_error:
             print("Impossibile connettersi ai proxy NAOqi: %s" % proxy_error[0])
             deadline_cancel.set()
             choreography_stop.set()
-            self.onStopped()
+            notify_stopped()
             return
         motionProxy = proxy_result["motion"]
         postureProxy = proxy_result["posture"]
         self._motion_proxy = motionProxy
         motion_proxy_holder.append(motionProxy)
-        if deadline_expired.is_set():
-            stop_robot_motion()
-            return
-
-        def arm_angles(pitch, roll, eyaw, eroll, wyaw=0.0, hand=0.0):
-            return [
-                math.radians(pitch),
-                math.radians(roll),
-                math.radians(eyaw),
-                math.radians(eroll),
-                math.radians(wyaw),
-                hand
-            ]
+        choreography_start = time.time()
+        deadline_thread = threading.Thread(target=enforce_deadline)
+        deadline_thread.daemon = True
+        deadline_thread.start()
 
         DANCE_JOINTS = __DANCE_JOINTS__
         DANCE_PHRASES = __DANCE_PHRASES__
 
-        def wait_until(target_time):
+        def wait_until(target_time, filler_name=None):
+            filler_index = 0
             while not choreography_stop.is_set():
                 remaining = target_time - time.time()
                 if remaining <= 0:
                     return True
-                time.sleep(min(0.05, remaining))
+                if filler_name and remaining > 0.08:
+                    pose = DANCE_PHRASES[filler_name][
+                        filler_index % len(DANCE_PHRASES[filler_name])
+                    ]
+                    frame_duration = min(0.5, remaining)
+                    angle_lists = []
+                    time_lists = []
+                    for joint_index, joint_name in enumerate(DANCE_JOINTS):
+                        angle = pose[joint_index]
+                        if joint_name not in ("LHand", "RHand"):
+                            angle = math.radians(angle)
+                        angle_lists.append([angle])
+                        time_lists.append([frame_duration])
+                    try:
+                        motionProxy.angleInterpolation(
+                            DANCE_JOINTS, angle_lists, time_lists, True
+                        )
+                    except Exception as error:
+                        print(
+                            "Impossibile eseguire il movimento di raccordo: %s"
+                            % error
+                        )
+                        filler_name = None
+                    filler_index += 1
+                else:
+                    time.sleep(min(0.05, remaining))
             return False
 
         def wait_for_task(task_proxy, task_id, deadline, stop_task):
@@ -683,11 +655,30 @@ class MyClass(GeneratedClass):
                 print("Errore nella frase %s: %s" % (name, error))
                 return False
 
+        def run_move_action(name, displacement, deadline):
+            if choreography_stop.is_set() or time.time() >= deadline:
+                print("Deadline raggiunta prima dello spostamento %s." % name)
+                return False
+            try:
+                task_id = motionProxy.post.moveTo(*displacement)
+                completed = wait_for_task(
+                    motionProxy, task_id, deadline,
+                    lambda: motionProxy.stop(task_id)
+                )
+                if not completed:
+                    print("Spostamento %s interrotto alla deadline." % name)
+                return completed
+            except Exception as error:
+                print("Errore nello spostamento %s: %s" % (name, error))
+                return False
+
+        last_action_completed = True
+
 ''' + all_steps_python + '''
 
         deadline_cancel.set()
         if not deadline_expired.is_set():
-            self.onStopped()
+            notify_stopped()
 ]]>
             </content>
         </script>
@@ -708,6 +699,56 @@ class MyClass(GeneratedClass):
         f.write(xar_template)
 
     return os.path.join(project_dir, "NAO_Choreography.pml")
+
+
+def export_choregraphe_test_box(output_path=None):
+    """Refresh the standalone test box from the planner's action catalog."""
+    if output_path is None:
+        output_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "RobotPositions",
+            "choregraphe_test_box.py",
+        )
+
+    with open(output_path, "r") as source_file:
+        template = source_file.read()
+
+    generated_values = {
+        "DANCE_JOINTS": positions.DANCE_JOINTS,
+        "DANCE_PHRASES": positions.DANCE_PHRASES,
+        "MOTION_PHRASES": {
+            action: phrase
+            for action in positions.ACTIONS
+            for phrase in [positions.get_motion_phrase(action)]
+            if phrase is not None
+        },
+        "MOVE_TO_ACTIONS": positions.MOVE_TO_ACTIONS,
+        "ACTION_DURATIONS": {
+            action: data["duration"]
+            for action, data in positions.ACTIONS.items()
+        },
+        "POSTURE_ACTIONS": tuple(
+            action
+            for action, data in positions.ACTIONS.items()
+            if data["type"] in ("start", "goal", "mandatory")
+            and positions.get_motion_phrase(action) is None
+        ),
+    }
+    start_marker = "        # BEGIN GENERATED PLANNER DATA"
+    end_marker = "        # END GENERATED PLANNER DATA"
+    start = template.index(start_marker)
+    end = template.index(end_marker, start) + len(end_marker)
+    data_block = [start_marker]
+    data_block.extend(
+        "        %s = %r" % (name, value)
+        for name, value in generated_values.items()
+    )
+    data_block.append(end_marker)
+    template = template[:start] + "\n".join(data_block) + template[end:]
+
+    with open(output_path, "w") as output_file:
+        output_file.write(template)
+    return output_path
 
 
 # ==============================================================================
@@ -750,6 +791,15 @@ def print_plan_summary(plan_result):
         "%s x%d" % (action, count)
         for action, count in sorted(plan_result["intermediate_usage"].items())
     ))
+    print(" - Spostamenti distinti: %d (minimo: %d) -> %s" % (
+        len(plan_result["distinct_spatial_actions"]),
+        MIN_DISTINCT_SPATIAL_ACTIONS,
+        "SODDISFATTO [OK]" if plan_result["is_space_ok"] else "FALLITO"
+    ))
+    print(" - Crouch: finestra %.1fs; durata stimata del movimento %.1fs" % (
+        plan_result["steps"][-1]["duration"],
+        positions.get_duration(positions.GOAL_POSITION),
+    ))
     print("=" * 95)
 
 
@@ -761,4 +811,5 @@ if __name__ == "__main__":
         json.dump(result, fp, indent=2)
 
     export_choregraphe_project(result)
+    export_choregraphe_test_box()
     print("\nProgetto Choregraphe aggiornato con successo per 'One More Time'!")
