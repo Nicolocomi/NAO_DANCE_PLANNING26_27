@@ -49,6 +49,8 @@ class MyClass(GeneratedClass):
 
         choreography_target_time = 120.0
         crouch_start_time = 114.0
+        stop_margin_seconds = 1.0
+        choreography_stop_time = choreography_target_time - stop_margin_seconds
         choreography_stop = threading.Event()
         deadline_expired = threading.Event()
         deadline_cancel = threading.Event()
@@ -77,7 +79,7 @@ class MyClass(GeneratedClass):
 
         def enforce_deadline():
             while not deadline_cancel.is_set():
-                remaining = choreography_start + choreography_target_time - time.time()
+                remaining = choreography_start + choreography_stop_time - time.time()
                 if remaining <= 0:
                     break
                 time.sleep(min(0.01, remaining))
@@ -85,7 +87,10 @@ class MyClass(GeneratedClass):
                 return
             deadline_expired.set()
             choreography_stop.set()
-            print("[LIMITE] 120 secondi raggiunti: arresto movimenti e coreografia.")
+            print(
+                "[LIMITE] Arresto anticipato di %.1f secondi: movimenti e coreografia interrotti."
+                % stop_margin_seconds
+            )
             stop_robot_motion()
             notify_stopped()
 
@@ -450,9 +455,9 @@ class MyClass(GeneratedClass):
         # Evento Musicale: Il beat sfuma dolcemente: passi d'onore e solenne inchino finale in ginocchio.
         # ======================================================================
         if not wait_until(choreography_start + crouch_start_time, "disco_groove" if last_action_completed else None): return
-        crouch_ok = run_posture_action("Crouch", 1.0, choreography_start + choreography_target_time)
+        crouch_ok = run_posture_action("Crouch", 1.0, choreography_start + choreography_stop_time)
         if not crouch_ok:
-            print("Errore: Crouch non completato entro il limite di 120 secondi.")
+            print("Errore: Crouch non completato entro il limite operativo.")
         if not wait_until(choreography_start + choreography_target_time): return
         choreography_stop.set()
 

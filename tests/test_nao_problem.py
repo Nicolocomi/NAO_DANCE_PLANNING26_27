@@ -142,7 +142,19 @@ class NaoProblemTests(unittest.TestCase):
                 content.index("proxy_ready.wait(15.0)"),
             )
             self.assertIn(
-                'run_posture_action("Crouch", 1.0, choreography_start + choreography_target_time)',
+                "choreography_stop_time = choreography_target_time - stop_margin_seconds",
+                content,
+            )
+            self.assertIn(
+                'run_posture_action("Crouch", 1.0, choreography_start + choreography_stop_time)',
+                content,
+            )
+            self.assertIn(
+                "remaining = choreography_start + choreography_stop_time - time.time()",
+                content,
+            )
+            self.assertIn(
+                "stop_margin_seconds = %.1f" % planner.EXECUTION_STOP_MARGIN_SECONDS,
                 content,
             )
             self.assertNotIn("time.sleep(dur)", content)

@@ -1,0 +1,51 @@
+NAO - ISTRUZIONI DI ESECUZIONE
+==============================
+
+REQUISITI
+---------
+- Python 3 per planner.py e main.py.
+- NumPy. Installarlo dalla cartella del progetto con:
+      python3 -m pip install -r requirements.txt
+- Choregraphe con un robot virtuale per la simulazione 3D.
+- Per collegare main.py al robot, SDK NAOqi compatibile con l'interprete
+  Python usato per avviarlo. Se NAOqi non è disponibile, main.py avvisa e
+  procede in modalità DRY-RUN.
+
+
+COME ESEGUIRE IL PROGETTO
+-------------------------
+
+1. Aprire un terminale nella cartella del progetto e installare i requisiti:
+       python3 -m pip install -r requirements.txt
+
+2. Generare il piano della coreografia e aggiornare il comportamento
+   Choregraphe:
+       python3 planner.py
+
+   Il planner genera la coreografia tramite ricerca A* e aggiorna:
+   - NAO_Choreography_Project/behavior_1/behavior.xar
+   - choreography_plan.json
+
+   choreography_plan.json è un risultato generato e può essere ricreato
+   eseguendo nuovamente planner.py.
+
+3. Eseguire la coreografia in Choregraphe:
+   - Aprire NAO_Choreography_Project/NAO_Choreography.pml
+     (File -> Open project...).
+   - Premere Play.
+
+   Il pulsante Play esegue il comportamento .xar senza avviare la musica.
+   Dopo aver rigenerato il progetto, ricaricarlo in Choregraphe prima di
+   premere Play, per evitare di eseguire una copia precedente del
+   comportamento.
+
+   Il planner programma il Crouch tra 114 e 120 secondi; per compensare il
+   tempo di risposta del comando di arresto, il runner ferma i movimenti a
+   119 secondi. Restano quindi 5 secondi per il Crouch. I tempi delle azioni
+   sono stime del planner e vanno verificati nel simulatore.
+
+ESEMPI
+------
+    python3 planner.py
+
+Durata totale e sezioni musicali sono configurate nel codice del planner.

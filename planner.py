@@ -38,6 +38,7 @@ DAFT_PUNK_SONG = {
 
 # Reserve a little extra time beyond the estimated Crouch motion duration.
 GOAL_RESERVE_SECONDS = max(6.0, positions.get_duration(positions.GOAL_POSITION))
+EXECUTION_STOP_MARGIN_SECONDS = 1.0
 MIN_DISTINCT_SPATIAL_ACTIONS = 3
 
 DAFT_PUNK_SECTIONS = [
@@ -393,9 +394,9 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
                 steps_code.append(
                     '        if not wait_until(choreography_start + crouch_start_time): return'
                 )
-            steps_code.append('        crouch_ok = run_posture_action("Crouch", 1.0, choreography_start + choreography_target_time)')
+            steps_code.append('        crouch_ok = run_posture_action("Crouch", 1.0, choreography_start + choreography_stop_time)')
             steps_code.append('        if not crouch_ok:')
-            steps_code.append('            print("Errore: Crouch non completato entro il limite di 120 secondi.")')
+            steps_code.append('            print("Errore: Crouch non completato entro il limite operativo.")')
             steps_code.append(
                 '        if not wait_until(choreography_start + choreography_target_time): return'
             )
@@ -478,6 +479,8 @@ class MyClass(GeneratedClass):
 
         choreography_target_time = __TARGET_TIME__
         crouch_start_time = __CROUCH_START_TIME__
+        stop_margin_seconds = __STOP_MARGIN__
+        choreography_stop_time = choreography_target_time - stop_margin_seconds
         choreography_stop = threading.Event()
         deadline_expired = threading.Event()
         deadline_cancel = threading.Event()
@@ -506,7 +509,7 @@ class MyClass(GeneratedClass):
 
         def enforce_deadline():
             while not deadline_cancel.is_set():
-                remaining = choreography_start + choreography_target_time - time.time()
+                remaining = choreography_start + choreography_stop_time - time.time()
                 if remaining <= 0:
                     break
                 time.sleep(min(0.01, remaining))
@@ -514,7 +517,10 @@ class MyClass(GeneratedClass):
                 return
             deadline_expired.set()
             choreography_stop.set()
-            print("[LIMITE] 120 secondi raggiunti: arresto movimenti e coreografia.")
+            print(
+                "[LIMITE] Arresto anticipato di %.1f secondi: movimenti e coreografia interrotti."
+                % stop_margin_seconds
+            )
             stop_robot_motion()
             notify_stopped()
 
@@ -694,6 +700,9 @@ class MyClass(GeneratedClass):
     xar_template = xar_template.replace("__DANCE_PHRASES__", repr(positions.DANCE_PHRASES))
     xar_template = xar_template.replace("__TARGET_TIME__", str(plan_result["total_time"]))
     xar_template = xar_template.replace("__CROUCH_START_TIME__", str(plan_result["steps"][-1]["start_time"]))
+    xar_template = xar_template.replace(
+        "__STOP_MARGIN__", str(EXECUTION_STOP_MARGIN_SECONDS)
+    )
 
     with open(os.path.join(project_dir, "behavior_1", "behavior.xar"), "w") as f:
         f.write(xar_template)

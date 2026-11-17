@@ -434,13 +434,13 @@ def main():
     print("\n[3/3] Premi INVIO per avviare musica e coreografia insieme...")
     sys.stdin.readline()
 
+    start_wall_time = time.monotonic()
     try:
         music_process = _start_music(disabled=args.no_music)
     except (IOError, RuntimeError) as error:
         print("[ERRORE] %s" % error)
         sys.exit(1)
 
-    start_wall_time = time.monotonic()
     print("\n" + "#" * 80)
     print("        INIZIO COREOGRAFIA NAO - SINCRONIZZAZIONE AL SECONDO ZERO")
     print("#" * 80)
@@ -449,8 +449,9 @@ def main():
     crouch_step = steps[-1]
     crouch_start = start_wall_time + crouch_step["start_time"]
     hard_deadline = start_wall_time + TARGET_TIME_SECONDS
+    stop_deadline = hard_deadline - planner.EXECUTION_STOP_MARGIN_SECONDS
     deadline_reached, cancel_watchdog = _start_deadline_watchdog(
-        hard_deadline, motion, music_process
+        stop_deadline, motion, music_process
     )
     forced_crouch = False
     completed_steps = []
@@ -485,12 +486,12 @@ def main():
         print("\n[LIMITE] Interrompo le altre mosse e riservo il finale al Crouch.")
         _stop_robot_motion(motion)
 
-    if time.monotonic() < hard_deadline and not deadline_reached.is_set():
+    if time.monotonic() < stop_deadline and not deadline_reached.is_set():
         _sleep_until(crouch_start)
-        if time.monotonic() < hard_deadline and not deadline_reached.is_set():
+        if time.monotonic() < stop_deadline and not deadline_reached.is_set():
             crouch_completed = execute_action(
                 crouch_step, args.robot_ip, args.port, dry_run=args.dry_run,
-                deadline=hard_deadline, motion_proxy=motion, posture_proxy=posture)
+                deadline=stop_deadline, motion_proxy=motion, posture_proxy=posture)
         else:
             crouch_completed = False
     else:
