@@ -20,6 +20,7 @@ class MyClass(GeneratedClass):
         ROBOT_IP = "127.0.0.1"
         PORT = 9559
         ACTION = "disco_groove"
+        SPEED_FRACTION = 1.0
 
         dance_joints = [
             "LShoulderPitch", "LShoulderRoll", "LElbowYaw", "LElbowRoll",
@@ -28,7 +29,6 @@ class MyClass(GeneratedClass):
             "HeadYaw", "HeadPitch"
         ]
         dance_phrases = {'disco_groove': [(28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'side_step_groove': [(38, 38, -65, -45, 0, 0.1, 42, -20, 72, 65, 0, 0.2, -16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (42, 20, -72, -65, 0, 0.2, 38, -38, 65, 45, 0, 0.1, 16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (38, 38, -65, -45, 0, 0.1, 42, -20, 72, 65, 0, 0.2, -16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (42, 20, -72, -65, 0, 0.2, 38, -38, 65, 45, 0, 0.1, 16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'robot_pulse': [(52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (42, 12, -75, -78, 0, 0.0, 42, -12, 75, 78, 0, 0.0, 0.0, 0.0), (52, 8, -80, -35, 0, 0.2, 52, -8, 80, 35, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'arm_wave_combo': [(18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (38, 38, -65, -45, 0, 0.1, 42, -20, 72, 65, 0, 0.2, -16, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'party_punches': [(28, 12, -70, -82, 0, 0.0, 58, -35, 60, 42, 0, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (58, 35, -60, -42, 0, 0.0, 28, -12, 70, 82, 0, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (28, 12, -70, -82, 0, 0.0, 58, -35, 60, 42, 0, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0), (58, 35, -60, -42, 0, 0.0, 28, -12, 70, 82, 0, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'climax_reach': [(18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (28, 12, -70, -82, 0, 0.0, 58, -35, 60, 42, 0, 0.0, -10, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (18, 30, -65, -65, 0, 0.1, -38, -18, 70, 28, 0, 0.1, -12, 0.0), (58, 35, -60, -42, 0, 0.0, 28, -12, 70, 82, 0, 0.0, 10, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'hello_wave': [(78, 16, -68, -49, 0, 0.0, 28, -20, 70, 65, 20, 1.0, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 45, -20, 1.0, -8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 80, 40, 1.0, 8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 45, -20, 1.0, -8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 80, 40, 1.0, 8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 45, -20, 1.0, -8, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 80, 40, 1.0, 8, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'wipe_forehead': [(78, 16, -68, -49, 0, 0.0, 20, -25, 45, 80, -40, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 55, 88, 20, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 20, -25, 45, 80, -40, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 55, 88, 20, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 20, -25, 45, 80, -40, 0.0, -10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 55, 88, 20, 0.0, 10, 0.0), (78, 16, -68, -49, 0, 0.0, 28, -20, 70, 65, 20, 1.0, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'arm_to_sky': [(78, 16, -68, -49, 0, 0.0, -60, -40, 80, 20, 0, 0.0, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, -60, -40, 80, 20, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, -60, -40, 80, 20, 0, 0.0, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (28, 38, -60, -28, 0, 0.2, 28, -38, 60, 28, 0, 0.2, 0.0, 0.0), (78, 16, -68, -49, 0, 0.0, 78, -16, 68, 49, 0, 0.0, 0.0, 0.0)], 'seated_arm_to_sky': [(78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (64, 18, -68, -45, 0, 0.0, -38, -28, 80, 35, 0, 0.0, 10, -3), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (64, 18, -68, -45, 0, 0.0, -38, -28, 80, 35, 0, 0.0, 10, -3), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (64, 18, -68, -45, 0, 0.0, -38, -28, 80, 35, 0, 0.0, 10, -3), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5), (78, 16, -68, -49, 0, 0.0, -48, -28, 80, 30, 0, 0.0, 0.0, -5)]}
-        action_durations = {'StandInit': 4.0, 'Crouch': 8.0, 'Sit': 5.0, 'SitRelax': 4.0, 'Stand': 4.5, 'StandZero': 3.5, 'Wipe Forehead': 5.0, 'Hello': 4.5, 'rotation_handgun': 8.0, 'right_arm': 10.0, 'arm_to_sky': 3.0, 'seated_arm_to_sky': 3.902, 'disco_groove': 3.902, 'side_step_groove': 3.902, 'robot_pulse': 3.902, 'arm_wave_combo': 3.902, 'party_punches': 3.902, 'climax_reach': 3.902, 'double_movement': 8.0, 'arms_opening': 10.0, 'union_arms': 9.0, 'move_forward': 4.0, 'move_backward': 4.0, 'diagonal_left': 4.0, 'diagonal_right': 4.0, 'rotation_foot_Lleg': 11.0, 'rotation_foot_Rleg': 11.0, 'sing_with_me': 14.0, 'arm_dance': 10.0, 'birthday_dance': 15.0, 'sprinkler': 8.0, 'workout': 12.0}
         phrase_for_action = {
             "Hello": "hello_wave",
             "Wipe Forehead": "wipe_forehead"
@@ -105,33 +105,37 @@ class MyClass(GeneratedClass):
 
         if phrase_name in dance_phrases:
             poses = dance_phrases[phrase_name]
-            duration = action_durations[ACTION]
-            frame_times = [
-                duration * frame / float(len(poses))
-                for frame in range(1, len(poses) + 1)
-            ]
-            angle_lists = []
-            time_lists = []
-            for joint_index, joint_name in enumerate(dance_joints):
-                joint_angles = [pose[joint_index] for pose in poses]
-                if joint_name not in ("LHand", "RHand"):
-                    joint_angles = [math.radians(angle) for angle in joint_angles]
-                angle_lists.append(joint_angles)
-                time_lists.append(frame_times)
-
             start = time.time()
-            motion.angleInterpolation(dance_joints, angle_lists, time_lists, True)
-            print("%s completato in %.3f secondi" % (ACTION, time.time() - start))
+            for pose in poses:
+                angles = []
+                for joint_index, joint_name in enumerate(dance_joints):
+                    angle = pose[joint_index]
+                    if joint_name not in ("LHand", "RHand"):
+                        angle = math.radians(angle)
+                    angles.append(angle)
+                motion.angleInterpolationWithSpeed(
+                    dance_joints, angles, SPEED_FRACTION
+                )
+            print(
+                "%s completato a %.0f%% in %.3f secondi"
+                % (ACTION, SPEED_FRACTION * 100, time.time() - start)
+            )
         elif ACTION in posture_actions:
             posture = ALProxy("ALRobotPosture", ROBOT_IP, PORT)
             start = time.time()
-            posture.goToPosture(ACTION, 0.65)
-            print("%s completato in %.3f secondi" % (ACTION, time.time() - start))
+            posture.goToPosture(ACTION, SPEED_FRACTION)
+            print(
+                "%s completato a %.0f%% in %.3f secondi"
+                % (ACTION, SPEED_FRACTION * 100, time.time() - start)
+            )
         elif ACTION in walking_actions:
             start = time.time()
             motion.setMoveArmsEnabled(False, False)
             motion.moveTo(*walking_actions[ACTION])
-            print("%s completato in %.3f secondi" % (ACTION, time.time() - start))
+            print(
+                "%s completato con moveTo/configurazione massima in %.3f secondi"
+                % (ACTION, time.time() - start)
+            )
         elif ACTION in behavior_actions:
             behavior_manager = ALProxy("ALBehaviorManager", ROBOT_IP, PORT)
             if not behavior_manager.isBehaviorInstalled(ACTION):
@@ -140,12 +144,15 @@ class MyClass(GeneratedClass):
                 )
             start = time.time()
             behavior_manager.runBehavior(ACTION)
-            print("%s completato in %.3f secondi" % (ACTION, time.time() - start))
+            print(
+                "%s completato a velocita' nativa in %.3f secondi"
+                % (ACTION, time.time() - start)
+            )
         elif ACTION in ("rotation_foot_Lleg", "rotation_foot_Rleg"):
             import motion as motion_constants
             posture = ALProxy("ALRobotPosture", ROBOT_IP, PORT)
             start = time.time()
-            posture.goToPosture("StandInit", 0.3)
+            posture.goToPosture("StandInit", SPEED_FRACTION)
             motion.wbEnable(True)
             try:
                 if ACTION == "rotation_foot_Rleg":
@@ -162,8 +169,11 @@ class MyClass(GeneratedClass):
                 )
             finally:
                 motion.wbEnable(False)
-            posture.goToPosture("StandInit", 0.25)
-            print("%s completato in %.3f secondi" % (ACTION, time.time() - start))
+            posture.goToPosture("StandInit", SPEED_FRACTION)
+            print(
+                "%s completato (traiettoria Torso a 3.0 s) in %.3f secondi"
+                % (ACTION, time.time() - start)
+            )
         elif ACTION == "rotation_handgun":
             start = time.time()
             left = (78.0, 16.6, -68.3, -49.2, 4.3, 0.0)
@@ -171,31 +181,41 @@ class MyClass(GeneratedClass):
             def arm_values(values):
                 return [math.radians(value) for value in values[:5]] + [values[5]]
             tasks = [
-                motion.post.angleInterpolation("LArm", arm_values(left), 1.0, True),
-                motion.post.angleInterpolation("RArm", arm_values(right), 1.0, True)
+                motion.post.angleInterpolationWithSpeed(
+                    "LArm", arm_values(left), SPEED_FRACTION
+                ),
+                motion.post.angleInterpolationWithSpeed(
+                    "RArm", arm_values(right), SPEED_FRACTION
+                )
             ]
             for task_id in tasks:
                 motion.wait(task_id, 0)
-            motion.angleInterpolation("RHand", 0.9, 1.0, True)
-            motion.angleInterpolation("RHand", 0.05, 1.0, True)
-            print("%s completato in %.3f secondi" % (ACTION, time.time() - start))
+            motion.angleInterpolationWithSpeed("RHand", 0.9, SPEED_FRACTION)
+            motion.angleInterpolationWithSpeed("RHand", 0.05, SPEED_FRACTION)
+            print(
+                "%s completato a %.0f%% in %.3f secondi"
+                % (ACTION, SPEED_FRACTION * 100, time.time() - start)
+            )
         elif ACTION in arm_sequences:
             start = time.time()
             def arm_values(values):
                 return [math.radians(value) for value in values[:5]] + [values[5]]
-            for left, right, phase_duration in arm_sequences[ACTION]:
+            for left, right, _phase_duration in arm_sequences[ACTION]:
                 tasks = []
                 if left is not None:
-                    tasks.append(motion.post.angleInterpolation(
-                        "LArm", arm_values(left), phase_duration, True
+                    tasks.append(motion.post.angleInterpolationWithSpeed(
+                        "LArm", arm_values(left), SPEED_FRACTION
                     ))
                 if right is not None:
-                    tasks.append(motion.post.angleInterpolation(
-                        "RArm", arm_values(right), phase_duration, True
+                    tasks.append(motion.post.angleInterpolationWithSpeed(
+                        "RArm", arm_values(right), SPEED_FRACTION
                     ))
                 for task_id in tasks:
                     motion.wait(task_id, 0)
-            print("%s completato in %.3f secondi" % (ACTION, time.time() - start))
+            print(
+                "%s completato a %.0f%% in %.3f secondi"
+                % (ACTION, SPEED_FRACTION * 100, time.time() - start)
+            )
         else:
             raise ValueError("Mossa non configurata: %s" % ACTION)
 

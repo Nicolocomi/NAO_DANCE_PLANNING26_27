@@ -77,6 +77,7 @@ DAFT_PUNK_SECTIONS = [
         "target_energy": 1,
         "target_mandatory": "SitRelax",
         "lyric": "La cassa si ferma! Atmosfera eterea e sospesa: NAO si rilassa seduto a terra.",
+        "required_actions": ["seated_arm_to_sky"],
         "weight": 0.0  # Transizione diretta seduta
     },
     {
@@ -98,8 +99,6 @@ DAFT_PUNK_SECTIONS = [
         "target_mandatory": "Wipe Forehead",
         "lyric": "Cassa a palla! Workout sfrenato e asciugamento fronte.",
         "cue_action": "arm_to_sky",
-        "required_actions": ["seated_arm_to_sky"],
-        "required_action_windows": {"seated_arm_to_sky": [6.8, 7.1]},
         "weight": 2.8
     },
     {
@@ -130,7 +129,7 @@ EXECUTABLE_INTERMEDIATE_ACTIONS = {
 # ==============================================================================
 def a_star_music_segment(start_action, target_action, target_duration, target_energy,
                          global_used_intermediates, required_first_action=None,
-                         required_actions=(), required_action_windows=None):
+                         required_actions=()):
     """Solve one song segment with the AIMA search library."""
     problem = NaoProblem(
         start_action=start_action,
@@ -141,7 +140,6 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
         executable_intermediate_actions=EXECUTABLE_INTERMEDIATE_ACTIONS,
         required_first_action=required_first_action,
         required_actions=required_actions,
-        required_action_windows=required_action_windows,
     )
     return problem.solve()
 
@@ -190,7 +188,6 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
             global_used_intermediates=global_intermediate_counts,
             required_first_action=sec.get("cue_action"),
             required_actions=sec.get("required_actions", ()),
-            required_action_windows=sec.get("required_action_windows")
         )
 
         for action, count in newly_used.items():
@@ -213,11 +210,11 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
     if goal_start_time < 0:
         raise ValueError("Durata target insufficiente per raggiungere la posizione Crouch.")
 
-    protected_actions = {
-        section["cue_action"]
-        for section in song_sections
-        if section.get("cue_action")
-    }
+    protected_actions = set()
+    for section in song_sections:
+        if section.get("cue_action"):
+            protected_actions.add(section["cue_action"])
+        protected_actions.update(section.get("required_actions", ()))
     time_before_goal = sum(
         positions.get_duration(action) for action in full_action_sequence[:-1]
     )

@@ -34,6 +34,8 @@ Movimenti:
   .crg); il tempo viene stampato nel Log Viewer. Le .crg devono essere
   installate nel robot virtuale. arm_dance è un box Choregraphe, non un file
   locale, e non è incluso nel box di prova.
+- timing_trials/: istruzioni e tabella CSV per misurare tutte le azioni,
+  annotare tre prove e aggiornare le durate in positions.py.
 - Il planner inserisce Arm_to_sky all'inizio della prima strofa, sul primo
   "One more time", e poi prosegue con le altre mosse.
 - L'A* può alternare le frasi di danza con gli spostamenti avanti, indietro e

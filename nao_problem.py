@@ -37,13 +37,11 @@ class NaoProblem(Problem):
         executable_intermediate_actions,
         required_first_action=None,
         required_actions=(),
-        required_action_windows=None,
     ):
         self.start_action = start_action
         self.target_action = target_action
         self.target_energy = target_energy
         self.global_used_intermediates = global_used_intermediates
-        self.required_action_windows = required_action_windows or {}
         self.required_actions = tuple(required_actions)
         self.required_action_bits = {
             action: 1 << index
@@ -142,12 +140,6 @@ class NaoProblem(Problem):
             required_bit = self.required_action_bits.get(action, 0)
             if required_bit and state.required_mask & required_bit:
                 continue
-            if required_bit:
-                window = self.required_action_windows.get(action)
-                if window:
-                    start_seconds = state.elapsed_ms / 1000.0
-                    if not window[0] <= start_seconds <= window[1]:
-                        continue
 
             action_bit = self.action_bits[action]
             repeated = bool(state.used_mask & action_bit)

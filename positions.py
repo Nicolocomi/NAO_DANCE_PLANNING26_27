@@ -234,7 +234,7 @@ ACTIONS = {
 
     # --- POSIZIONI OBBLIGATORIE (MANDATORY) ---
     "Sit": {
-        "duration": 5.0,
+        "duration": 6.0,
         "energy": 1,
         "pre": STANDING,
         "post": SITTING,
@@ -261,7 +261,7 @@ ACTIONS = {
         "description": "Il robot si rialza in piedi con energia (snare riser)"
     },
     "StandZero": {
-        "duration": 3.5,
+        "duration": 4.0,
         "energy": 3,
         "pre": STANDING,
         "post": STANDING,
@@ -308,7 +308,7 @@ ACTIONS = {
         "description": "Rotazione disco-funk del braccio destro sopra la testa"
     },
     "arm_to_sky": {
-        "duration": 3.0,
+        "duration": 4.0,
         "energy": 4,
         "pre": STANDING,
         "post": STANDING,
@@ -317,18 +317,18 @@ ACTIONS = {
         "description": "Alza il braccio destro verso il cielo sul primo 'One more time'"
     },
     "seated_arm_to_sky": {
-        "duration": 3.902,
+        "duration": 4.5,
         "energy": 5,
-        "pre": None,
-        "post": STANDING,
+        "pre": SITTING,
+        "post": SITTING,
         "type": "intermediate",
         "file": "RobotPositions/23-Seated_arm_to_sky.py",
         "dance_phrase": True,
         "cue_only": True,
-        "description": "Richiamo del ritornello con braccio destro alto, eseguibile anche da seduto"
+        "description": "Richiamo del ritornello con braccio destro alto da seduto"
     },
     "disco_groove": {
-        "duration": 3.902,
+        "duration": 4.5,
         "energy": 4,
         "pre": STANDING,
         "post": STANDING,
@@ -338,7 +338,7 @@ ACTIONS = {
         "description": "Groove disco a braccia alternate, in otto battiti"
     },
     "side_step_groove": {
-        "duration": 3.902,
+        "duration": 4.5,
         "energy": 3,
         "pre": STANDING,
         "post": STANDING,
@@ -527,14 +527,8 @@ EXPLICIT_INCOMPATIBILITIES = {
     ("diagonal_right", "diagonal_left"),
 
     # Ripetere consecutivamente rotazioni della stessa gamba destabilizza il baricentro
-    ("rotation_foot_RLeg", "rotation_foot_RLeg"),
-    ("rotation_foot_LLeg", "rotation_foot_LLeg"),
-
-    # Crouch è lo stato terminale
-    ("Crouch", "StandInit"),
-    ("Crouch", "Stand"),
-    ("Crouch", "move_forward"),
-    ("Crouch", "right_arm")
+    ("rotation_foot_Rleg", "rotation_foot_Rleg"),
+    ("rotation_foot_Lleg", "rotation_foot_Lleg")
 }
 
 # ==============================================================================
@@ -565,6 +559,9 @@ def is_transition_valid(prev_action, next_action):
 
     prev_data = ACTIONS[prev_action]
     next_data = ACTIONS[next_action]
+
+    if prev_action == GOAL_POSITION:
+        return False
 
     if (prev_action, next_action) in EXPLICIT_INCOMPATIBILITIES:
         return False
