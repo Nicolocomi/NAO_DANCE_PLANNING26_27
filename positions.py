@@ -1,21 +1,14 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 """
 positions.py - Modellazione dello Spazio degli Stati, Azioni e Vincoli per NAO.
 Fundamentals of Artificial Intelligence - NAO Planning Competition (UniBo)
 Ottimizzato per la sincronizzazione musicale con Daft Punk - 'One More Time' (123 BPM)
 """
 
-# ==============================================================================
-# 1. MACRO-POSTURE (Stati cinematici del Robot)
-# ==============================================================================
 STANDING = "STANDING"    # In piedi (posizione eretta o bilanciata per movimenti/passi)
 SITTING = "SITTING"      # Seduto (a terra o su supporto)
 CROUCHING = "CROUCHING"  # In ginocchio / rannicchiato (stato finale)
 
-# ==============================================================================
-# 2. DEFINIZIONE DEGLI STATI CHIAVE (Slide 12, 13 e 15)
-# ==============================================================================
 START_POSITION = "StandInit"  # Stato Iniziale al tempo t = 0
 GOAL_POSITION = "Crouch"      # Stato Finale al tempo t = 120s (2 min)
 
@@ -31,33 +24,32 @@ MANDATORY_POSITIONS = [
 
 # Set di posizioni intermedie e movimenti di base (richiesto l'uso di almeno 5 distinte)
 INTERMEDIATE_POSITIONS = [
-    "rotation_handgun",      # Movimento del braccio con oggetto/ventaglio
-    "right_arm",             # Rotazione del braccio destro sopra la testa
-    "arm_to_sky",            # Braccio destro verso il cielo sul primo "One more time"
+    "rotation_handgun",
+    "right_arm",
+    "arm_to_sky",
     "disco_groove",
     "side_step_groove",
     "robot_pulse",
     "arm_wave_combo",
     "party_punches",
     "climax_reach",
-    "double_movement",       # Rotazione sincrona di entrambi gli arti superiori
-    "arms_opening",          # Apertura e rotazione di entrambi gli arti superiori
-    "union_arms",            # Movimento di unione delle braccia
-    "move_forward",          # 3 passi in avanti
-    "move_backward",         # 3 passi indietro
-    "diagonal_left",         # 1 passo diagonale a sinistra
-    "diagonal_right",        # 1 passo diagonale a destra
-    "rotation_foot_Lleg",    # Movimento con la gamba/piede sinistro
-    "rotation_foot_Rleg",    # Movimento con la gamba/piede destro
+    "double_movement",
+    "arms_opening",
+    "union_arms",
+    "move_forward",
+    "move_backward",
+    "diagonal_left",
+    "diagonal_right",
+    "rotation_foot_Lleg",
+    "rotation_foot_Rleg",
 ]
 
-# Animazioni avanzate da file .crg (importabili in Choregraphe)
 CRG_ANIMATIONS = [
-    "sing_with_me",          # NAO suona la chitarra
-    "arm_dance",             # Danza con movimento delle braccia
-    "birthday_dance",        # Danza di compleanno
-    "sprinkler",             # Danza sprinkler
-    "workout"                # Esercizio fisico / allenamento
+    "sing_with_me",
+    "arm_dance",
+    "birthday_dance",
+    "sprinkler",
+    "workout"
 ]
 
 # Pose frames are degrees (hand values stay in NAO's 0..1 range). Each phrase
@@ -222,9 +214,6 @@ DANCE_PHRASES = {
     ]
 }
 
-# ==============================================================================
-# 3. CATALOGO COMPLETO DELLE AZIONI (METADATI, DURATE, ENERGIA E POSTURE)
-# ==============================================================================
 # Ogni azione specifica:
 # - 'duration': durata stimata di esecuzione (in secondi)
 # - 'energy': livello energetico da 1 (calmo/a terra) a 5 (massimo dinamismo/climax)
@@ -234,7 +223,6 @@ DANCE_PHRASES = {
 # - 'file': file sorgente o riferimento in RobotPositions/
 # - 'description': breve descrizione del movimento
 ACTIONS = {
-    # --- STATO INIZIALE & GOAL ---
     "StandInit": {
         "duration": 4.0,
         "energy": 2,
@@ -254,7 +242,6 @@ ACTIONS = {
         "description": "Inchino finale rannicchiato / in ginocchio (chiusura)"
     },
 
-    # --- POSIZIONI OBBLIGATORIE (MANDATORY) ---
     "Sit": {
         "duration": 7.0,
         "energy": 1,
@@ -312,7 +299,6 @@ ACTIONS = {
         "description": "Gesto di saluto con la mano destra al pubblico"
     },
 
-    # --- POSIZIONI INTERMEDIE (INTERMEDIATE) ---
     "rotation_handgun": {
         "duration": 5.0,
         "energy": 3,
@@ -499,7 +485,6 @@ ACTIONS = {
         "file": "RobotPositions/12-Rotation_foot_RLeg.py",
         "description": "Footwork ritmico e bilanciamento sulla gamba destra"
     },
-    # --- ANIMAZIONI DA FILE .CRG ---
     "sing_with_me": {
         "duration": 14.0,
         "energy": 5,
@@ -547,9 +532,6 @@ ACTIONS = {
     }
 }
 
-# ==============================================================================
-# 4. INCOMPATIBILITÀ ESPLICITE
-# ==============================================================================
 EXPLICIT_INCOMPATIBILITIES = {
     # Non eseguire passi opposti consecutivi
     ("move_forward", "move_backward"),
@@ -562,9 +544,6 @@ EXPLICIT_INCOMPATIBILITIES = {
     ("rotation_foot_Lleg", "rotation_foot_Lleg")
 }
 
-# ==============================================================================
-# 5. FUNZIONI HELPER
-# ==============================================================================
 def get_duration(action_name):
     """Restituisce la durata in secondi di un'azione."""
     if action_name in ACTIONS:

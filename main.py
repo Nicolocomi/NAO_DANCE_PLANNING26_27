@@ -35,9 +35,6 @@ except ImportError:
     NAOQI_AVAILABLE = False
 
 
-# ==============================================================================
-# ESECUZIONE DELLE SINGOLE AZIONI SUL ROBOT
-# ==============================================================================
 def _sleep_until(deadline):
     remaining = deadline - time.monotonic()
     if remaining > 0:
@@ -377,9 +374,6 @@ def execute_action(step_info, robot_ip, port, dry_run=False, deadline=None,
     return True
 
 
-# ==============================================================================
-# ENTRY POINT PRINCIPALE
-# ==============================================================================
 def main():
     parser = argparse.ArgumentParser(description="Esecutore Coreografia NAO - Planning Competition UniBo")
     parser.add_argument("robot_ip", nargs="?", default="127.0.0.1", help="Indirizzo IP del robot (default: 127.0.0.1)")

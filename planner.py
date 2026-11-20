@@ -1,23 +1,4 @@
-"""
-planner.py - Modulo di AI Planning Music-Driven per la NAO Planning Competition.
-Fundamentals of Artificial Intelligence - Università di Bologna (UniBo)
-
-Colonna Sonora Ufficiale: Daft Punk - 'One More Time' (123 BPM, 4/4)
-Durata: 120.0 Secondi (Esattamente 2:00 minuti)
-
-Caratteristiche del Planning Musicale:
-- Allineamento Metrico (123 BPM): ogni battuta dura ~1.95s; i cambi di sezione avvengono
-  su frasi musicali di 8 battute (~15.6s) o 16 battute (~31.2s).
-- Riconoscimento delle Sezioni:
-    1. Intro (Horns Hook): Risveglio del robot e saluto al pubblico.
-    2. Verse 1 ('One more time, we're gonna celebrate'): Inizio del groove e passi avanti.
-    3. Chorus 1 ('A celebration alright!'): Drop chitarra elettrica ed esplosione di festa.
-    4. Breakdown 1 ('Music's got me feeling...'): La cassa sparisce! Pausa seduta sul tappeto d'archi.
-    5. Breakdown 2 (Snare Riser): Rullante in crescendo, il robot si rialza energico.
-    6. Mega Drop Climax ('ONE MORE TIME!'): Apice dello show! Workout e sudore.
-    7. Outro (Fade Out): Inchino finale e chiusura ad esattamente 120 secondi.
-- Ricerca A* multi-obiettivo, che bilancia durata, energia, varietà e ripetizioni.
-"""
+"""Pianifica ed esporta una coreografia NAO sincronizzata alla musica."""
 
 import json
 import os
@@ -25,9 +6,6 @@ import os
 import positions
 from nao_problem import NaoProblem
 
-# ==============================================================================
-# 1. STRUTTURA METRICO-MUSICALE DI "ONE MORE TIME" (DAFT PUNK)
-# ==============================================================================
 DAFT_PUNK_SONG = {
     "title": "One More Time",
     "artist": "Daft Punk",
@@ -36,7 +14,7 @@ DAFT_PUNK_SONG = {
     "total_target_time": 120.0
 }
 
-# Reserve a little extra time beyond the estimated Crouch motion duration.
+# Riserva almeno sei secondi al Crouch finale.
 GOAL_RESERVE_SECONDS = max(6.0, positions.get_duration(positions.GOAL_POSITION))
 EXECUTION_STOP_MARGIN_SECONDS = 1.0
 MIN_DISTINCT_SPATIAL_ACTIONS = 3
@@ -118,13 +96,10 @@ DAFT_PUNK_SECTIONS = [
     }
 ]
 
-# These actions have dedicated, timed handlers in the Choregraphe exporter.
+# L'exporter Choregraphe gestisce queste azioni con handler temporizzati.
 EXECUTABLE_INTERMEDIATE_ACTIONS = set(positions.MOVE_TO_ACTIONS)
 
 
-# ==============================================================================
-# 3. RICERCA A* PER UN SINGOLO SEGMENTO MUSICALE
-# ==============================================================================
 def a_star_music_segment(start_action, target_action, target_duration, target_energy,
                          global_used_intermediates, required_first_action=None,
                          required_actions=()):
@@ -142,9 +117,6 @@ def a_star_music_segment(start_action, target_action, target_duration, target_en
     return problem.solve()
 
 
-# ==============================================================================
-# 4. PIANIFICATORE GLOBALE MUSIC-DRIVEN
-# ==============================================================================
 def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_intermediates=5):
     """
     Pianifica l'intera coreografia sincronizzandola con la timeline di Daft Punk - One More Time.
@@ -333,9 +305,6 @@ def plan_choreography(target_total_time=120.0, song_sections=None, min_distinct_
     }
 
 
-# ==============================================================================
-# 5. ESPORTATORE AUTOMATICO PER CHOREGRAPHE
-# ==============================================================================
 def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Project"):
     os.makedirs(os.path.join(project_dir, "behavior_1"), exist_ok=True)
 
@@ -362,10 +331,7 @@ def export_choregraphe_project(plan_result, project_dir="NAO_Choreography_Projec
             else None
         )
 
-        steps_code.append("        # ======================================================================")
         steps_code.append("        # PASSO %02d [%s]: %s (%.1fs -> %.1fs)" % (step_num, sec_name, act, t_start, t_end))
-        steps_code.append("        # Evento Musicale: %s" % lyric)
-        steps_code.append("        # ======================================================================")
         if act != "Crouch":
             steps_code.append("        if choreography_stop.is_set(): return")
             if filler_phrase:
@@ -474,8 +440,7 @@ class MyClass(GeneratedClass):
             self.onStopped()
 
     def onInput_onStart(self):
-        # NOTA: La musica va avviata ESTERNAMENTE (da main.py o manualmente).
-        # NON usare subprocess/os dentro Choregraphe: crasha il simulatore.
+        # Choregraphe può bloccarsi se il box avvia processi esterni.
 
         choreography_target_time = __TARGET_TIME__
         crouch_start_time = __CROUCH_START_TIME__
@@ -760,9 +725,6 @@ def export_choregraphe_test_box(output_path=None):
     return output_path
 
 
-# ==============================================================================
-# 6. STAMPA DELLA TIMELINE MUSICALE
-# ==============================================================================
 def print_plan_summary(plan_result):
     print("=" * 95)
     print("      NAO DANCE PLANNER - GROOVE A BEAT: DAFT PUNK - 'ONE MORE TIME' (123 BPM)")
